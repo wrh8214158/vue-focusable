@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "target": "ES2015",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    /** 路径别名 */
+    "baseUrl": "./",
+    "paths": {
+      "@": ["src"],
+      "@/*": ["src/*"],
+      "third-lib": ["node_modules/third-lib"]
+    },
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "declaration": true, // 需要设置为 true 来支持类型
+    "emitDeclarationOnly": true, // 只生成类型文件，不转译ts文件
+    "declarationDir": "lib", // 类型文件的导出目录
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* Build */
+    "removeComments": true, // 是否移除 TypeScript 代码中的注释
+    "noEmitHelpers": true, // 是否禁止生成 TypeScript 帮助函数
+    "downlevelIteration": true, // 是否将 for...of 循环编译为适用于旧版 JavaScript 的代码
+    "importHelpers": true, // 是否使用模块化方式引入帮助函数
+
+    "types": [
+      "vite/client" // if using vite
+    ]
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

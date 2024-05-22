@@ -1,0 +1,64 @@
+{
+  "name": "vue-focusable",
+  "private": false,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "An auto-focusable lib for Vue",
+  "keywords": [
+    "focusable",
+    "vue",
+    "tv"
+  ],
+  "author": "WuRonghua <1065219101@qq.com> (https://github.com/wrh8214158)",
+  "contributors": [
+    "WURONGHUA <wrh8214158@gmail.com> (https://github.com/wrh8214158)"
+  ],
+  "homepage": "https://github.com/wrh8214158/vue-focusable",
+  "bugs": {
+    "url": "https://github.com/wrh8214158/vue-focusable/issues"
+  },
+  "repository": "https://github.com/wrh8214158/vue-focusable",
+  "main": "./lib/index.umd.cjs",
+  "module": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "import": "./lib/index.js",
+      "require": "./lib/index.umd.cjs",
+      "types": "./lib/index.d.ts"
+    }
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "scripts": {
+    "start": "vite --host",
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "release:patch": "npm version patch --message 'v%s' && npm publish && npm run _release:push-branch",
+    "release:minor": "npm version minor --message 'v%s' && npm publish && npm run _release:push-branch",
+    "release:major": "npm version major --message 'v%s' && npm publish && npm run _release:push-branch",
+    "_release:push-branch": "git push --follow-tags --set-upstream origin `git rev-parse --abbrev-ref HEAD`"
+  },
+  "dependencies": {
+    "@tweenjs/tween.js": "^23.1.2"
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-runtime": "^7.24.3",
+    "@babel/preset-env": "^7.24.5",
+    "@babel/runtime-corejs3": "^7.24.5",
+    "@rollup/plugin-babel": "^6.0.4",
+    "core-js": "^3.37.1",
+    "terser": "^5.31.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vite-plugin-dts": "^3.9.1"
+  }
+}
