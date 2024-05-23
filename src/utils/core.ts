@@ -69,7 +69,15 @@ export const getCurrFocusEl = () => {
 export const getFocusableEls = () => {
   const { itemAttrname } = defaultConfig;
   const limitGroup = getLimitGroupEl();
-  return Array.from(limitGroup.querySelectorAll(`[${itemAttrname}]`));
+  const currFocusEl = getCurrFocusEl();
+  const scrollItemKey = currFocusEl?.getAttribute(SCROLL_ITEM_KEY);
+  const scrollItemAttr = `[${SCROLL_ITEM_KEY}="${scrollItemKey}"]`;
+  const scrollEls = [...document.querySelectorAll(`[${itemAttrname}]${scrollItemAttr}`)];
+  const otherEls = [...limitGroup.querySelectorAll(`[${itemAttrname}]:not(${scrollItemAttr})`)];
+  return {
+    scrollEls,
+    otherEls
+  };
 };
 
 export const next = (el: Next) => {
@@ -148,7 +156,7 @@ export const next = (el: Next) => {
     });
     const scrollItemKey = target.getAttribute(SCROLL_ITEM_KEY);
     const scrollGroup = scrollItemKey
-      ? document.querySelector(`[${SCROLL_GROUP_KEY}-${scrollItemKey}]`)
+      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollItemKey}"]`)
       : null;
     if (scrollGroup) {
       doAnimate({
@@ -167,88 +175,94 @@ export const next = (el: Next) => {
 
 export const getNextFocusEl = (direction: DirectionString) => {
   const currFocusEl = getCurrFocusEl();
-  const focusableEls = getFocusableEls();
+  const { scrollEls, otherEls } = getFocusableEls();
   if (currFocusEl) {
-    const {
-      top: originTop,
-      right: originRight,
-      bottom: originBottom,
-      left: originLeft,
-      width: originWidth,
-      height: originHeight
-    } = currFocusEl.getBoundingClientRect();
-    const ORIGIN_NUM = Infinity;
-    // 有相交的下一个元素元组
-    let intersectedFinalFocusElTuple: [number, Element | null] = [ORIGIN_NUM, null];
-    // 无相交的下一个元素元组
-    let notIntersectedFinalFocusElTuple: [number, Element | null] = [ORIGIN_NUM, null];
     switch (direction) {
       case LEFT:
       case RIGHT:
       case UP:
       case DOWN: {
-        focusableEls.forEach((el) => {
-          const {
-            top: currTop,
-            right: currRight,
-            bottom: currBottom,
-            left: currLeft,
-            width: currWidth,
-            height: currHeight
-          } = el.getBoundingClientRect();
-          const sameSideMap = {
-            left: currLeft < originLeft,
-            right: currRight > originRight,
-            up: currTop < originTop,
-            down: currBottom > originBottom
-          };
-          const isIntersected = ((direction) => {
-            const leftRight = () =>
-              (currTop >= originTop && currTop <= originBottom) ||
-              (currBottom >= originTop && currBottom <= originBottom);
-            const upDown = () =>
-              (currLeft >= originLeft && currLeft <= originRight) ||
-              (currRight >= originLeft && currRight <= originRight);
-            return {
-              left: leftRight,
-              right: leftRight,
-              up: upDown,
-              down: upDown
-            }[direction]();
-          })(direction);
-          if (el !== currFocusEl && sameSideMap[direction] && currWidth && currHeight) {
-            // 斜边长
-            const sideLen = calculateHypotenuse(
-              originWidth / 2 + originLeft - (currWidth / 2 + currLeft),
-              originHeight / 2 + originTop - (currHeight / 2 + currTop)
-            );
-            if (isIntersected) {
-              // 相交
-              if (sideLen < intersectedFinalFocusElTuple[0]) {
-                intersectedFinalFocusElTuple = [sideLen, el];
-              }
-            } else {
-              if (intersectedFinalFocusElTuple[0] === ORIGIN_NUM) {
-                // 如果相交里有值，则不再计算不相交的值
-                if (sideLen < notIntersectedFinalFocusElTuple[0]) {
-                  notIntersectedFinalFocusElTuple = [sideLen, el];
-                }
-              }
-            }
-          }
-        });
-        break;
+        return (
+          dealIntersectedEl({ currFocusEl, focusableEls: scrollEls, direction }) ||
+          dealIntersectedEl({ currFocusEl, focusableEls: otherEls, direction }) ||
+          currFocusEl ||
+          null
+        );
       }
       default: {
-        break;
+        return currFocusEl || null;
       }
     }
-    return (
-      intersectedFinalFocusElTuple[1] || notIntersectedFinalFocusElTuple[1] || currFocusEl || null
-    );
   } else {
-    return focusableEls[0] || null;
+    return (document.querySelector(`[${defaultConfig.itemAttrname}]`) as Element) || null;
   }
+};
+
+const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
+  const {
+    top: originTop,
+    right: originRight,
+    bottom: originBottom,
+    left: originLeft,
+    width: originWidth,
+    height: originHeight
+  } = currFocusEl.getBoundingClientRect();
+  const ORIGIN_NUM = Infinity;
+  // 有相交的下一个元素元组
+  let intersectedFinalFocusElTuple: [number, Element | null] = [ORIGIN_NUM, null];
+  // 无相交的下一个元素元组
+  let notIntersectedFinalFocusElTuple: [number, Element | null] = [ORIGIN_NUM, null];
+  focusableEls.forEach((el) => {
+    const {
+      top: currTop,
+      right: currRight,
+      bottom: currBottom,
+      left: currLeft,
+      width: currWidth,
+      height: currHeight
+    } = el.getBoundingClientRect();
+    const sameSideMap = {
+      left: currLeft < originLeft,
+      right: currRight > originRight,
+      up: currTop < originTop,
+      down: currBottom > originBottom
+    };
+    const isIntersected = ((direction) => {
+      const leftRight = () =>
+        (currTop >= originTop && currTop <= originBottom) ||
+        (currBottom >= originTop && currBottom <= originBottom);
+      const upDown = () =>
+        (currLeft >= originLeft && currLeft <= originRight) ||
+        (currRight >= originLeft && currRight <= originRight);
+      return {
+        left: leftRight,
+        right: leftRight,
+        up: upDown,
+        down: upDown
+      }[direction]();
+    })(direction);
+    if (el !== currFocusEl && sameSideMap[direction] && currWidth && currHeight) {
+      // 斜边长
+      const sideLen = calculateHypotenuse(
+        originWidth / 2 + originLeft - (currWidth / 2 + currLeft),
+        originHeight / 2 + originTop - (currHeight / 2 + currTop)
+      );
+      if (isIntersected) {
+        // 相交
+        if (sideLen < intersectedFinalFocusElTuple[0]) {
+          intersectedFinalFocusElTuple = [sideLen, el];
+        }
+      } else {
+        if (intersectedFinalFocusElTuple[0] === ORIGIN_NUM) {
+          // 如果相交里有值，则不再计算不相交的值
+          if (sideLen < notIntersectedFinalFocusElTuple[0]) {
+            notIntersectedFinalFocusElTuple = [sideLen, el];
+          }
+        }
+      }
+    }
+  });
+  return intersectedFinalFocusElTuple[1] || notIntersectedFinalFocusElTuple[1] || null;
 };
 
 export const doAnimate = ({
@@ -285,24 +299,26 @@ export const doAnimate = ({
     width: focusWidth = 0,
     height: focusHeight = 0
   } = focusEl?.getBoundingClientRect() || {};
-  const currScrollEl = scrollEl || limitGroupEls.slice(-1)[0] || getScrollEl();
+  const currScrollEl = (scrollEl || limitGroupEls.slice(-1)[0] || getScrollEl()) as HTMLElement;
   const {
-    clientHeight: scrollClientHeight,
-    clientWidth: scrollClientWidth,
-    clientLeft: scrollClientLeft,
-    clientTop: scrollClientTop
-  } = currScrollEl;
+    top: focusScrollTop = 0,
+    right: focusScrollRight = 0,
+    bottom: focusScrollBottom = 0,
+    left: focusScrollLeft = 0,
+    width: focusScrollWidth = 0,
+    height: focusScrollHeight = 0
+  } = currScrollEl?.getBoundingClientRect() || {};
   const { offsetDistanceDx, offsetDistanceDy } =
     distanceToCenter ?? sDistanceToCenter
       ? {
-          offsetDistanceDx: (scrollClientWidth - focusWidth) / 2,
-          offsetDistanceDy: (scrollClientHeight - focusHeight) / 2
+          offsetDistanceDx: (focusScrollWidth - focusWidth) / 2,
+          offsetDistanceDy: (focusScrollHeight - focusHeight) / 2
         }
       : {
           offsetDistanceDx: offsetDistanceX ?? offsetDistanceSx,
           offsetDistanceDy: offsetDistanceY ?? offsetDistanceSy
         };
-  if (focusTop - offsetDistanceDy < scrollClientTop) {
+  if (focusTop - offsetDistanceDy < focusScrollTop) {
     // 上
     runAnimate({
       scrollEl: currScrollEl,
@@ -315,7 +331,7 @@ export const doAnimate = ({
       to: currScrollEl.scrollTop + focusTop - offsetDistanceDy
     });
   }
-  if (focusLeft - offsetDistanceDx < scrollClientLeft) {
+  if (focusLeft - offsetDistanceDx < focusScrollLeft) {
     // 左
     runAnimate({
       scrollEl: currScrollEl,
@@ -325,10 +341,10 @@ export const doAnimate = ({
       end,
       easing,
       from: currScrollEl.scrollLeft,
-      to: currScrollEl.scrollLeft + focusLeft - offsetDistanceDx
+      to: currScrollEl.scrollLeft + focusLeft - focusScrollLeft - offsetDistanceDx
     });
   }
-  if (focusRight + offsetDistanceDx > scrollClientLeft + scrollClientWidth) {
+  if (focusRight + offsetDistanceDx > focusScrollRight) {
     // 右
     runAnimate({
       scrollEl: currScrollEl,
@@ -338,10 +354,10 @@ export const doAnimate = ({
       end,
       easing,
       from: currScrollEl.scrollLeft,
-      to: currScrollEl.scrollLeft + focusRight + offsetDistanceDx - scrollClientWidth
+      to: currScrollEl.scrollLeft + focusRight + offsetDistanceDx - focusScrollRight
     });
   }
-  if (focusBottom + offsetDistanceDy > scrollClientTop + scrollClientHeight) {
+  if (focusBottom + offsetDistanceDy > focusScrollBottom) {
     // 下
     runAnimate({
       scrollEl: currScrollEl,
@@ -351,23 +367,9 @@ export const doAnimate = ({
       end,
       easing,
       from: currScrollEl.scrollTop,
-      to: currScrollEl.scrollTop + (focusBottom + offsetDistanceDy - scrollClientHeight)
+      to: currScrollEl.scrollTop + (focusBottom + offsetDistanceDy - focusScrollBottom)
     });
   }
-};
-
-export const runAnimate = ({ scrollEl, scrollType, smooth, smoothTime, end, easing, from, to }) => {
-  const { smoothTime: sSmoothTime } = defaultConfig;
-  TWEEN.add(
-    new TWEEN.Tween({ [scrollType]: from })
-      .to({ [scrollType]: to }, smooth ? smoothTime ?? sSmoothTime : 0)
-      .onUpdate((object) => {
-        scrollType && (scrollEl[scrollType] = object[scrollType]);
-      })
-      .easing(getEasing(easing))
-      .start()
-  );
-  updateScroll({ end });
 };
 
 // 获取当前焦点元素所在块的滚动父元素
@@ -375,12 +377,12 @@ export const getScrollEl = () => {
   const currFocusEl = getCurrFocusEl();
   const scrollGroupKey = currFocusEl?.getAttribute(SCROLL_ITEM_KEY);
   const scrollGroup = scrollGroupKey
-    ? document.querySelector(`[${SCROLL_GROUP_KEY}-${scrollGroupKey}]`)
+    ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollGroupKey}"]`)
     : null;
   return scrollGroup || HTML || BODY;
 };
 
-// 获取全局的滚动元素
+// 获取全局的限制组元素
 export const getRootScrollEl = () => {
   const currFocusEl = getCurrFocusEl();
   const limitGroupKey = currFocusEl?.getAttribute(LIMIT_ITEM_KEY);
@@ -396,7 +398,7 @@ export const getLimitGroupEl = () => {
   return limitGroupEls.slice(-1)[0] || HTML || BODY;
 };
 
-export const setLimitGroupEl = (arr) => {
+export const setLimitGroupEl = (arr: Element[]) => {
   limitGroupEls = arr;
 };
 
@@ -448,6 +450,20 @@ export const setOffsetDistanceY = (val: number) => {
   defaultConfig.offsetDistanceY = val;
 };
 
+const runAnimate = ({ scrollEl, scrollType, smooth, smoothTime, end, easing, from, to }) => {
+  const { smoothTime: sSmoothTime } = defaultConfig;
+  TWEEN.add(
+    new TWEEN.Tween({ [scrollType]: from })
+      .to({ [scrollType]: to }, smooth ? smoothTime ?? sSmoothTime : 0)
+      .onUpdate((object) => {
+        scrollType && (scrollEl[scrollType] = object[scrollType]);
+      })
+      .easing(getEasing(easing))
+      .start()
+  );
+  updateScroll({ end });
+};
+
 const nextInNext = ({ currFocusEl, nextFocusEl, direction }) => {
   currFocusEl === nextFocusEl && lastDirection === direction ? counter++ : (counter = 0);
   const prevCount = directionCount;
@@ -483,7 +499,7 @@ const dealScrollDirection = ({ currFocusEl, nextFocusEl, direction }) => {
   const scrollDirection = currFocusEl?.getAttribute(SCROLL_DIRECTION_KEY) || '';
   const scrollItem = currFocusEl?.getAttribute(SCROLL_ITEM_KEY) || '';
   const scrollGroup = scrollItem
-    ? document.querySelector(`[${SCROLL_GROUP_KEY}-${scrollItem}]`)
+    ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollItem}"]`)
     : null;
   switch (scrollDirection) {
     case 'x': {

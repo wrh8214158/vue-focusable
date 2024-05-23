@@ -72,7 +72,7 @@ export const dealScrollGroup = (el: HTMLElement, value: 'x' | 'y') => {
     x: 'x',
     y: 'y'
   };
-  el.setAttribute(`${SCROLL_GROUP_KEY}-${scroll_group_count}`, '');
+  el.setAttribute(SCROLL_GROUP_KEY, String(scroll_group_count));
   Array.from(el.querySelectorAll(`[${itemAttrname}]`)).forEach((item) => {
     item.setAttribute(SCROLL_ITEM_KEY, String(scroll_group_count));
     item.setAttribute(SCROLL_DIRECTION_KEY, scrollDirection[value] || 'both');
