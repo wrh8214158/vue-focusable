@@ -5,7 +5,8 @@ import {
   SCROLL_GROUP_KEY,
   LIMIT_GROUP_KEY,
   LIMIT_ITEM_KEY,
-  defaultConfig
+  defaultConfig,
+  PARENT_SCROLL_GROUP_KEY
 } from './config';
 import {
   dealKeydown,
@@ -13,15 +14,15 @@ import {
   dealTouchstart,
   dealTouchmove,
   dealTouchend,
-  dealTouchcancel,
-  dealContextmenu
+  dealTouchcancel
 } from './event';
+import { ArrayFrom, ArrayIncludes } from './polyfill';
 
 let scroll_group_count = -1;
 let limit_group_count = -1;
 
 export const initEvent = () => {
-  [
+  const arr = [
     {
       eventName: 'keydown',
       event: dealKeydown
@@ -45,19 +46,17 @@ export const initEvent = () => {
     {
       eventName: 'touchcancel',
       event: dealTouchcancel
-    },
-    {
-      eventName: 'contextmenu',
-      event: dealContextmenu
     }
-  ].forEach(({ eventName, event }: { eventName: string; event: any }) =>
-    document.addEventListener(eventName, event)
-  );
+  ];
+  for (let i = 0; i < arr.length; i++) {
+    const { eventName, event } = arr[i] as { eventName: string; event: any };
+    document.addEventListener(eventName, event);
+  }
 };
 
 export const dealFocusable = (el: HTMLElement, value: boolean) => {
   const { itemAttrname } = defaultConfig;
-  if ([undefined, true].includes(value)) {
+  if (ArrayIncludes([undefined, true], value)) {
     el.setAttribute(itemAttrname, '');
   } else {
     el.removeAttribute(itemAttrname);
@@ -66,27 +65,44 @@ export const dealFocusable = (el: HTMLElement, value: boolean) => {
 
 export const dealScrollGroup = (el: HTMLElement, value: 'x' | 'y') => {
   const { itemAttrname } = defaultConfig;
-  el.style.overflow = 'auto';
-  scroll_group_count++;
   const scrollDirection = {
     x: 'x',
     y: 'y'
   };
-  el.setAttribute(SCROLL_GROUP_KEY, String(scroll_group_count));
-  Array.from(el.querySelectorAll(`[${itemAttrname}]`)).forEach((item) => {
-    item.setAttribute(SCROLL_ITEM_KEY, String(scroll_group_count));
-    item.setAttribute(SCROLL_DIRECTION_KEY, scrollDirection[value] || 'both');
-  });
+  el.style.overflow = 'auto';
+  if (!el.hasAttribute(SCROLL_GROUP_KEY)) {
+    scroll_group_count++;
+    el.setAttribute(SCROLL_GROUP_KEY, String(scroll_group_count));
+  }
+  const currScrollGroupCount = el.getAttribute(SCROLL_GROUP_KEY) || '';
+  const SCROLL_GROUP_KEY_ARR = ArrayFrom(el.querySelectorAll(`[${SCROLL_GROUP_KEY}]`));
+  for (let i = 0; i < SCROLL_GROUP_KEY_ARR.length; i++) {
+    const item = SCROLL_GROUP_KEY_ARR[i];
+    item.setAttribute(PARENT_SCROLL_GROUP_KEY, currScrollGroupCount);
+  }
+  const ITEM_ATTRNAME_ARR = ArrayFrom(el.querySelectorAll(`[${itemAttrname}]`));
+  for (let i = 0; i < ITEM_ATTRNAME_ARR.length; i++) {
+    const item = ITEM_ATTRNAME_ARR[i];
+    if (!item.hasAttribute(SCROLL_ITEM_KEY)) {
+      item.setAttribute(SCROLL_ITEM_KEY, currScrollGroupCount);
+      scrollDirection[value] && item.setAttribute(SCROLL_DIRECTION_KEY, scrollDirection[value]);
+    }
+  }
 };
 
 export const dealLimitGroup = (el: HTMLElement, value: boolean) => {
+  const { itemAttrname } = defaultConfig;
   if (!el.hasAttribute(LIMIT_GROUP_KEY)) {
-    const { itemAttrname } = defaultConfig;
     limit_group_count++;
     el.setAttribute(`${LIMIT_GROUP_KEY}`, String(limit_group_count));
-    Array.from(el.querySelectorAll(`[${itemAttrname}]`)).forEach((item) => {
-      item.setAttribute(LIMIT_ITEM_KEY, String(limit_group_count));
-    });
+  }
+  const currLimitGroupCount = el.getAttribute(LIMIT_GROUP_KEY) || '';
+  const ITEM_ATTRNAME_ARR = ArrayFrom(el.querySelectorAll(`[${itemAttrname}]`));
+  for (let i = 0; i < ITEM_ATTRNAME_ARR.length; i++) {
+    const item = ITEM_ATTRNAME_ARR[i];
+    if (!item.hasAttribute(LIMIT_ITEM_KEY)) {
+      item.setAttribute(LIMIT_ITEM_KEY, currLimitGroupCount);
+    }
   }
   onLimitChange(el, value);
 };

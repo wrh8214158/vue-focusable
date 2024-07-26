@@ -19,4 +19,7 @@ export interface DefaultConfig {
   touchpad: boolean;
   autoFocus: boolean;
   setCountAttr: boolean;
+  endToNext: boolean;
 }
+
+export type DefaultConfigPartial = Partial<DefaultConfig>;

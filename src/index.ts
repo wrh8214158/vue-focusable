@@ -1,24 +1,49 @@
 import { initEvent, dealFocusable, dealScrollGroup, dealLimitGroup } from './utils';
 import { defaultConfig } from './utils/config';
-import { getMountedKey, getVueVersion } from './utils/common';
-import type { DefaultConfig } from './types/config.d';
-export * from './utils/core';
+import { getDiffKey, getVueVersion } from './utils/common';
+import type { DefaultConfigPartial } from './types/config.d';
+import {
+  getCurrFocusEl,
+  getFocusableEls,
+  requestFocus,
+  next,
+  getNextFocusEl,
+  doAnimate,
+  getScrollEl,
+  getLastFocusEl,
+  getLimitGroupEl,
+  limitGroupElsPush,
+  limitGroupElsPop,
+  onLimitChange,
+  setAutoFocus,
+  setDistanceToCenter,
+  setOffsetDistance,
+  setOffsetDistanceX,
+  setOffsetDistanceY,
+  setEndToNext
+} from './utils/core';
 
 declare const define: any;
-declare const exports: any;
 declare const module: any;
 
 initEvent();
 
-export const focusable = (data = {} as DefaultConfig) => {
-  Object.assign(defaultConfig, data);
+const { mountedKey, updatedKey } = getDiffKey();
+
+export const focusable = (data = {} as DefaultConfigPartial) => {
+  // 初始化默认配置
+  for (const key in data) {
+    if (key in defaultConfig) {
+      defaultConfig[key] = data[key];
+    }
+  }
   return {
     // 在绑定元素的父组件，及他自己的所有子节点都挂载完成后调用
-    [getMountedKey()](el, binding) {
+    [mountedKey](el, binding) {
       dealFocusable(el, binding.value);
     },
     // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
-    updated(el, binding) {
+    [updatedKey](el, binding) {
       dealFocusable(el, binding.value);
     }
   };
@@ -27,7 +52,11 @@ export const focusable = (data = {} as DefaultConfig) => {
 export const scrollGroup = () => {
   return {
     // 在绑定元素的父组件，及他自己的所有子节点都挂载完成后调用
-    [getMountedKey()](el, binding) {
+    [mountedKey](el, binding) {
+      dealScrollGroup(el, binding.value);
+    },
+    // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
+    [updatedKey](el, binding) {
       dealScrollGroup(el, binding.value);
     }
   };
@@ -36,45 +65,85 @@ export const scrollGroup = () => {
 export const limitGroup = () => {
   return {
     // 在绑定元素的父组件，及他自己的所有子节点都挂载完成后调用
-    [getMountedKey()](el, binding) {
+    [mountedKey](el, binding) {
       dealLimitGroup(el, binding.value);
     },
     // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
-    updated(el, binding) {
+    [updatedKey](el, binding) {
       dealLimitGroup(el, binding.value);
     }
   };
 };
 
-const install = (options = {} as DefaultConfig) => ({
+const install = (options = {} as DefaultConfigPartial) => ({
   install(Vue) {
     if ((install as any).installed) return;
     (install as any).installed = true;
     getVueVersion(Vue);
-    const [FOCUSABLE, SCROLL_GROUP, LIMIT_GROUP] = ['focusable', 'scrollGroup', 'limitGroup'];
-    [
-      { key: FOCUSABLE, value: focusable },
-      { key: SCROLL_GROUP, value: scrollGroup },
-      { key: LIMIT_GROUP, value: limitGroup }
-    ].forEach(({ key, value }) => {
-      if (key === FOCUSABLE) {
-        Vue.directive(key, value(options));
-      } else {
-        Vue.directive(key, value());
-      }
-    });
+    const eventArr = [
+      { key: 'focusable', value: focusable },
+      { key: 'scrollGroup', value: scrollGroup },
+      { key: 'limitGroup', value: limitGroup }
+    ];
+    for (let i = 0; i < eventArr.length; i++) {
+      const { key, value } = eventArr[i];
+      Vue.directive(key, value(options));
+    }
   }
 });
 
-if (typeof exports === 'object') {
+if (typeof module === 'object' && module.exports) {
   // 支持 CommonJS
-  module.exports = (val: DefaultConfig) => install(val);
-} else if (typeof define == 'function' && define.amd) {
+  module.exports = install;
+} else if (typeof define === 'function' && define.amd) {
   // 支持 AMD
-  define([], (val: DefaultConfig) => install(val));
+  define([], install);
 } else if ((window as any).Vue) {
-  // Vue 是全局变量时，自动调用 Vue.use()
-  (window as any).Vue.use((val: DefaultConfig) => install(val));
+  // Vue 是全局变量时
+  (window as any).VueFocusable = install;
+  const protoFunc = {
+    getCurrFocusEl,
+    getFocusableEls,
+    next,
+    getNextFocusEl,
+    doAnimate,
+    getScrollEl,
+    getLastFocusEl,
+    getLimitGroupEl,
+    limitGroupElsPush,
+    limitGroupElsPop,
+    onLimitChange,
+    setAutoFocus,
+    setDistanceToCenter,
+    setOffsetDistance,
+    setOffsetDistanceX,
+    setOffsetDistanceY,
+    setEndToNext
+  };
+  for (const key in protoFunc) {
+    (window as any).VueFocusable.__proto__[key] = protoFunc[key];
+  }
 }
+
+export {
+  getCurrFocusEl,
+  getFocusableEls,
+  requestFocus,
+  next,
+  getNextFocusEl,
+  doAnimate,
+  getScrollEl,
+  getLastFocusEl,
+  getLimitGroupEl,
+  limitGroupElsPush,
+  limitGroupElsPop,
+  onLimitChange,
+  setAutoFocus,
+  setDistanceToCenter,
+  setOffsetDistance,
+  setOffsetDistanceX,
+  setOffsetDistanceY,
+  setEndToNext
+};
 
 export default install;

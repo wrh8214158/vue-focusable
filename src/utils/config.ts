@@ -1,6 +1,7 @@
 import type { DefaultConfig } from '../types/config.d';
 
 // 滚动组和限制组属性名
+export const PARENT_SCROLL_GROUP_KEY = 'parent-scroll-group';
 export const SCROLL_GROUP_KEY = 'scroll-group';
 export const SCROLL_DIRECTION_KEY = 'scroll-direction';
 export const SCROLL_ITEM_KEY = 'scroll-item';
@@ -9,7 +10,9 @@ export const LIMIT_ITEM_KEY = 'limit-item';
 
 // 事件名映射
 export const ONFOCUS = 'on-focus';
+export const LOWCAMEL_ONFOCUS = 'onFocus';
 export const ONBLUR = 'on-blur';
+export const LOWCAMEL_ONBLUR = 'onBlur';
 export const UP = 'up';
 export const DOWN = 'down';
 export const LEFT = 'left';
@@ -44,5 +47,6 @@ export const defaultConfig: DefaultConfig = {
   distanceToCenter: false,
   touchpad: true,
   autoFocus: true,
-  setCountAttr: true
+  setCountAttr: true,
+  endToNext: false
 };

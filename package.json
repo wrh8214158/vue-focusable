@@ -1,7 +1,7 @@
 {
   "name": "vue-focusable",
   "private": false,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "description": "An auto-focusable lib for Vue",
   "keywords": [
@@ -11,7 +11,7 @@
   ],
   "author": "WuRonghua <1065219101@qq.com> (https://github.com/wrh8214158)",
   "contributors": [
-    "WURONGHUA <wrh8214158@gmail.com> (https://github.com/wrh8214158)"
+    "WURONGHUA <1065219101@qq.com> (https://github.com/wrh8214158)"
   ],
   "homepage": "https://github.com/wrh8214158/vue-focusable",
   "bugs": {
@@ -20,11 +20,10 @@
   "repository": "https://github.com/wrh8214158/vue-focusable",
   "main": "./lib/index.umd.cjs",
   "module": "./lib/index.js",
+  "unpkg": "./lib/index.umd.cjs",
   "types": "./lib/index.d.ts",
   "files": [
-    "lib",
-    "README.md",
-    "LICENSE"
+    "lib"
   ],
   "exports": {
     ".": {
@@ -47,18 +46,14 @@
     "release:major": "npm version major --message 'v%s' && npm publish && npm run _release:push-branch",
     "_release:push-branch": "git push --follow-tags --set-upstream origin `git rev-parse --abbrev-ref HEAD`"
   },
-  "dependencies": {
-    "@tweenjs/tween.js": "^23.1.2"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "@babel/plugin-transform-runtime": "^7.24.3",
-    "@babel/preset-env": "^7.24.5",
-    "@babel/runtime-corejs3": "^7.24.5",
+    "@babel/preset-env": "^7.24.8",
     "@rollup/plugin-babel": "^6.0.4",
-    "core-js": "^3.37.1",
-    "terser": "^5.31.0",
-    "typescript": "^5.4.5",
-    "vite": "^5.2.11",
+    "@types/node": "^20.14.12",
+    "terser": "^5.31.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.4",
     "vite-plugin-dts": "^3.9.1"
   }
 }

@@ -13,6 +13,28 @@ let dblenterTimer: number | null = null;
 export let touchEl: Element | null = null;
 // 点击的执行次数
 let enterCount = 0;
+// 滚动时间间隔
+const TIMEOUT = 16.67;
+// 定时器
+export const requestAnimationFrame =
+  window.requestAnimationFrame || // @ts-expect-error requestAnimationFrame
+  window.webkitRequestAnimationFrame || // @ts-expect-error webkitRequestAnimationFrame
+  window.mozRequestAnimationFrame || // @ts-expect-error mozRequestAnimationFrame
+  window.oRequestAnimationFrame || // @ts-expect-error oRequestAnimationFrame
+  window.msRequestAnimationFrame ||
+  function (callback) {
+    window.setTimeout(callback, TIMEOUT);
+  };
+// 取消定时器
+export const cancelAnimationFrame =
+  window.cancelAnimationFrame || // @ts-expect-error cancelAnimationFrame
+  window.webkitCancelAnimationFrame || // @ts-expect-error webkitCancelAnimationFrame
+  window.mozCancelAnimationFrame || // @ts-expect-error mozCancelAnimationFrame
+  window.oCancelAnimationFrame || // @ts-expect-error oCancelAnimationFrame
+  window.msCancelAnimationFrame ||
+  function (callback) {
+    window.clearTimeout(callback);
+  };
 
 export const dealKeydown = (e: KeyboardEvent) => {
   const key = getKey(e);
@@ -47,8 +69,12 @@ export const dealKeyup = (e: KeyboardEvent) => {
       if (isLongPress) {
         clearDblenterTimer();
       } else {
-        !dblenterTimer &&
-          (dblenterTimer = window.setTimeout(dealEnter, defaultConfig.dblEnterTime));
+        const { dblEnterTime } = defaultConfig;
+        if (dblEnterTime) {
+          !dblenterTimer && (dblenterTimer = window.setTimeout(dealEnter, dblEnterTime));
+        } else {
+          enter();
+        }
       }
       isLongPress = false;
       break;
@@ -83,12 +109,17 @@ export const dealTouchmove = () => {
 };
 
 export const dealTouchend = (e: TouchEvent) => {
-  const { touchpad, itemAttrname } = defaultConfig;
+  const { touchpad, itemAttrname, dblEnterTime } = defaultConfig;
   if (touchpad) {
     clearLongPressTimer();
     const currFocusEl = getCurrFocusEl();
-    currFocusEl &&
-      [UP, RIGHT, DOWN, LEFT].forEach((item) => currFocusEl.removeAttribute(`${item}-count`));
+    if (currFocusEl) {
+      const DIRECTION_ARR = [UP, RIGHT, DOWN, LEFT];
+      for (let i = 0; i < DIRECTION_ARR.length; i++) {
+        const item = DIRECTION_ARR[i];
+        currFocusEl.removeAttribute(`${item}-count`);
+      }
+    }
     const target = e.target as HTMLElement;
     const pressEl = (touchEl && dealPressed(touchEl, false)) || null;
     if (target.hasAttribute(itemAttrname)) {
@@ -97,8 +128,11 @@ export const dealTouchend = (e: TouchEvent) => {
         if (isLongPress) {
           clearDblenterTimer();
         } else {
-          !dblenterTimer &&
-            (dblenterTimer = window.setTimeout(dealEnter, defaultConfig.dblEnterTime));
+          if (dblEnterTime) {
+            !dblenterTimer && (dblenterTimer = window.setTimeout(dealEnter, dblEnterTime));
+          } else {
+            enter();
+          }
         }
         next(touchEl);
         isLongPress = false;
@@ -110,10 +144,6 @@ export const dealTouchend = (e: TouchEvent) => {
 
 export const dealTouchcancel = () => {
   touchEl && dealPressed(touchEl, false);
-};
-
-export const dealContextmenu = (e: Event) => {
-  e.preventDefault();
 };
 
 const dealDirection = (e: Event, direction: DirectionString) => {
