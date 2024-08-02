@@ -2,7 +2,7 @@
 
 [![NPM Version][npm-image]][npm-url] [![NPM License][npm-licence]][licence-url] [![NPM Unpacked Size][npm-size]][size-url]
 
-> An auto-focusable lib for Vue, 0 Dependencies
+> An auto-focusable lib for Vue, 0 Dependencies, Support Vue 2.x and Vue 3.x
 
 <div align="center">
   <a href="https://github.com/wrh8214158/vue-focusable">
@@ -86,12 +86,7 @@ APP.mount('#app');
       name="viewport"
       content="width=device-width,initial-scale=1.0,minimum-scale=1,maximum-scale=1,user-scalable=no"
     />
-    <title>Vue.js CDN Example</title>
-    <script
-      type="text/javascript"
-      src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"
-    ></script>
-    <script type="text/javascript" src="./js/index.umd.cjs"></script>
+    <title>VueFocusable Example</title>
     <style type="text/css">
       * {
         margin: 0;
@@ -126,7 +121,11 @@ APP.mount('#app');
         <div class="item" v-focusable v-for="item in 200" :key="item">{{ item }}</div>
       </div>
     </div>
-
+    <script type="text/javascript" src="https://unpkg.com/vue@2.7.14/dist/vue.min.js"></script>
+    <script
+      type="text/javascript"
+      src="https://unpkg.com/vue-focusable@1.2.1/lib/index.umd.cjs"
+    ></script>
     <script type="text/javascript">
       Vue.use(
         VueFocusable({
@@ -171,17 +170,34 @@ APP.mount('#app');
 ```html
 <!-- 如焦点在 v-scroll-group 包裹的元素里，超出时会触发滚动，可设置滚动方向 -->
 <template>
-  <div class="scroll-group" v-scroll-group="direction">
+  <div
+    class="scroll-group"
+    v-scroll-group="scrollGroup"
+    @scrollIn="scrollIn"
+    @scrollOut="scrollOut"
+  >
     <slot></slot>
   </div>
 </template>
 
 <script setup lang="ts">
   /**
-   * 设置滚动方向，有 x，y 可选，如不填，则两个方向超出时都会触发滚动
-   * 填写有方向的情况下，焦点只会寻找十字相交方向上的下一个点，不会再寻找不相交的最近一个点
+   * @param direction: x | y，设置滚动方向，有 x，y 可选，如不填，则两个方向超出时都会触发滚动，填写有方向的情况下，焦点只会寻找十字相交方向上的下一个点，不会再寻找不相交的最近一个点
+   * @param record: boolean，默认为 true，会自动记录离开滚动组前的落焦点，下次再进入时先去历史落焦点
    */
-  const direction = ref('y');
+  const direction = ref({
+    direction: 'y',
+    record: true
+  });
+
+  // 针对 v-scroll-group 元素的事件
+  const scrollIn = () => {
+    // 焦点进入滚动组时会触发一次
+  };
+
+  const scrollOut = () => {
+    // 焦点离开滚动组时会触发一次
+  };
 </script>
 ```
 
@@ -202,11 +218,12 @@ APP.mount('#app');
 | `focusedAttrname`  | 当前落焦元素新增的属性值标识                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `String`             | `focused`     |
 | `pressedAttrname`  | 当前落焦元素按下回车键时增加的属性值标识                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `String`             | `pressed`     |
 | `easing`           | 控制滚动的动画，可选值有<br/>`Linear`<br/>`Quad.easeIn`、`Quad.easeOut`、`Quad.easeInOut`<br/>`Cubic.easeIn`、`Cubic.easeOut`、`Cubic.easeInOut`<br/>`Quart.easeIn`、`Quart.easeOut`、`Quart.easeInOut`<br/>`Quint.easeIn`、`Quint.easeOut`、`Quint.easeInOut`<br/>`Sine.easeIn`、`Sine.easeOut`、`Sine.easeInOut`<br/>`Expo.easeIn`、`Expo.easeOut`、`Expo.easeInOut`<br/>`Circ.easeIn`、`Circ.easeOut`、`Circ.easeInOut`<br/>`Elastic.easeIn`、`Elastic.easeOut`、`Elastic.easeInOut`<br/>`Back.easeIn`、`Back.easeOut`、`Back.easeInOut`<br/>`Bounce.easeIn`、`Bounce.easeOut`、`Bounce.easeInOut`<br/>默认为空，使用 `Quart.easeOut`<br/>(注：输入不合法的值时会使用默认值)<br/>动画示例可参考 [TWEEN.Easing][TWEEN.Easing] | `String \| Function` | `''`          |
-| `smoothTime`       | 滚动动画的执行时间（ms）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `Number`             | `300`         |
+| `smoothTime`       | 滚动动画的执行时间（ms）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `Number`             | `800`         |
 | `offsetDistanceX`  | X 轴方向距离边缘的距离（px）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `Number`             | `50`          |
 | `offsetDistanceY`  | Y 轴方向距离边缘的距离（px）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `Number`             | `50`          |
 | `longPressTime`    | 长按响应触发时长（ms）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `Number`             | `700`         |
 | `dblEnterTime`     | 双击响应触发时长（ms）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `Number`             | `200`         |
+| `scrollDelay`      | 长按或快速按方向键时的延迟                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `Number`             | `0`           |
 | `distanceToCenter` | 焦点是否在滚动区域居中，优先级比 offsetDistanceX 和 offsetDistanceY 高                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `Boolean`            | `false`       |
 | `touchpad`         | 是否支持触屏模式                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `Boolean`            | `true`        |
 | `autoFocus`        | 是否开启按方向键时自动寻焦                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `Boolean`            | `true`        |
@@ -228,12 +245,16 @@ APP.mount('#app');
 | `setLimitGroupEl`                 | 设置限制组元素元素                                        | Element[]                                                                                                                                                                                                                                                                                                                                                                                   | void                 |
 | `limitGroupElsPush`               | 向限制组中 push 元素                                      | Element                                                                                                                                                                                                                                                                                                                                                                                     | Element              |
 | `limitGroupElsPop`                | 删除限制组中最后一个                                      | void                                                                                                                                                                                                                                                                                                                                                                                        | Element \| undefined |
+| `getDefaultConfig`                | 获取默认配置项的值（传入上面 Options 的值）               | String                                                                                                                                                                                                                                                                                                                                                                                      |                      |
 | `setAutoFocus`                    | 设置是否响应键盘方向键，及点击事件                        | Boolean                                                                                                                                                                                                                                                                                                                                                                                     | void                 |
 | `setDistanceToCenter`             | 设置全局滚动是否居中                                      | Boolean                                                                                                                                                                                                                                                                                                                                                                                     | void                 |
 | `setOffsetDistance`               | 同时设置 `offsetDistanceX` 和 `setOffsetDistanceY` 的距离 | Number                                                                                                                                                                                                                                                                                                                                                                                      | void                 |
 | `setOffsetDistanceX`              | 设置 `offsetDistanceX` 的距离                             | Number                                                                                                                                                                                                                                                                                                                                                                                      | void                 |
 | `setOffsetDistanceY`              | 设置 `offsetDistanceY` 的距离                             | Number                                                                                                                                                                                                                                                                                                                                                                                      | void                 |
+| `setSmoothTime`                   | 设置滚动持续时间                                          | Number                                                                                                                                                                                                                                                                                                                                                                                      | void                 |
+| `setScrollDelay`                  | 设置快速点击或者按住方向键时的响应时间                    | Number                                                                                                                                                                                                                                                                                                                                                                                      | 0                    |
 | `setEndToNext`                    | 设置是否当前元素滚动结束后再继续下一个焦点落焦            | Boolean                                                                                                                                                                                                                                                                                                                                                                                     | false                |
+| `scrollingElement`                | 全局的滚动元素（常量，非函数）                            | Element                                                                                                                                                                                                                                                                                                                                                                                     |                      |
 
 事件：
 

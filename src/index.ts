@@ -1,7 +1,13 @@
-import { initEvent, dealFocusable, dealScrollGroup, dealLimitGroup } from './utils';
 import { defaultConfig } from './utils/config';
 import { getDiffKey, getVueVersion } from './utils/common';
 import type { DefaultConfigPartial } from './types/config.d';
+import {
+  initEvent,
+  dealFocusable,
+  dealScrollGroup,
+  unbindScrollGroup,
+  dealLimitGroup
+} from './utils';
 import {
   getCurrFocusEl,
   getFocusableEls,
@@ -12,6 +18,7 @@ import {
   getScrollEl,
   getLastFocusEl,
   getLimitGroupEl,
+  getDefaultConfig,
   limitGroupElsPush,
   limitGroupElsPop,
   onLimitChange,
@@ -20,7 +27,10 @@ import {
   setOffsetDistance,
   setOffsetDistanceX,
   setOffsetDistanceY,
-  setEndToNext
+  setSmoothTime,
+  setScrollDelay,
+  setEndToNext,
+  scrollingElement
 } from './utils/core';
 
 declare const define: any;
@@ -28,7 +38,7 @@ declare const module: any;
 
 initEvent();
 
-const { mountedKey, updatedKey } = getDiffKey();
+let _mountedKey, _updatedKey, _unmounted;
 
 export const focusable = (data = {} as DefaultConfigPartial) => {
   // 初始化默认配置
@@ -39,11 +49,11 @@ export const focusable = (data = {} as DefaultConfigPartial) => {
   }
   return {
     // 在绑定元素的父组件，及他自己的所有子节点都挂载完成后调用
-    [mountedKey](el, binding) {
+    [_mountedKey](el, binding) {
       dealFocusable(el, binding.value);
     },
     // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
-    [updatedKey](el, binding) {
+    [_updatedKey](el, binding) {
       dealFocusable(el, binding.value);
     }
   };
@@ -52,12 +62,15 @@ export const focusable = (data = {} as DefaultConfigPartial) => {
 export const scrollGroup = () => {
   return {
     // 在绑定元素的父组件，及他自己的所有子节点都挂载完成后调用
-    [mountedKey](el, binding) {
+    [_mountedKey](el, binding) {
       dealScrollGroup(el, binding.value);
     },
     // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
-    [updatedKey](el, binding) {
+    [_updatedKey](el, binding) {
       dealScrollGroup(el, binding.value);
+    },
+    [_unmounted](el) {
+      unbindScrollGroup(el);
     }
   };
 };
@@ -65,11 +78,11 @@ export const scrollGroup = () => {
 export const limitGroup = () => {
   return {
     // 在绑定元素的父组件，及他自己的所有子节点都挂载完成后调用
-    [mountedKey](el, binding) {
+    [_mountedKey](el, binding) {
       dealLimitGroup(el, binding.value);
     },
     // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
-    [updatedKey](el, binding) {
+    [_updatedKey](el, binding) {
       dealLimitGroup(el, binding.value);
     }
   };
@@ -80,6 +93,10 @@ const install = (options = {} as DefaultConfigPartial) => ({
     if ((install as any).installed) return;
     (install as any).installed = true;
     getVueVersion(Vue);
+    const { mountedKey, updatedKey, unmountedKey } = getDiffKey();
+    _mountedKey = mountedKey;
+    _updatedKey = updatedKey;
+    _unmounted = unmountedKey;
     const eventArr = [
       { key: 'focusable', value: focusable },
       { key: 'scrollGroup', value: scrollGroup },
@@ -110,6 +127,7 @@ if (typeof module === 'object' && module.exports) {
     getScrollEl,
     getLastFocusEl,
     getLimitGroupEl,
+    getDefaultConfig,
     limitGroupElsPush,
     limitGroupElsPop,
     onLimitChange,
@@ -118,6 +136,8 @@ if (typeof module === 'object' && module.exports) {
     setOffsetDistance,
     setOffsetDistanceX,
     setOffsetDistanceY,
+    setSmoothTime,
+    setScrollDelay,
     setEndToNext
   };
   for (const key in protoFunc) {
@@ -135,6 +155,7 @@ export {
   getScrollEl,
   getLastFocusEl,
   getLimitGroupEl,
+  getDefaultConfig,
   limitGroupElsPush,
   limitGroupElsPop,
   onLimitChange,
@@ -143,7 +164,10 @@ export {
   setOffsetDistance,
   setOffsetDistanceX,
   setOffsetDistanceY,
-  setEndToNext
+  setSmoothTime,
+  setScrollDelay,
+  setEndToNext,
+  scrollingElement
 };
 
 export default install;

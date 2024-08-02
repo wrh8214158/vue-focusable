@@ -12,12 +12,14 @@ export const getDiffKey = () => {
   if (vueVersion >= 3) {
     return {
       mountedKey: 'mounted',
-      updatedKey: 'updated'
+      updatedKey: 'updated',
+      unmountedKey: 'unmounted'
     };
   } else {
     return {
       mountedKey: 'inserted',
-      updatedKey: 'update'
+      updatedKey: 'update',
+      unmountedKey: 'unbind'
     };
   }
 };

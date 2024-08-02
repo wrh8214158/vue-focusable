@@ -7,6 +7,9 @@ import {
   SCROLL_GROUP_KEY,
   SCROLL_DIRECTION_KEY,
   SCROLL_ITEM_KEY,
+  SCROLL_RECORD_KEY,
+  SCROLL_OUT,
+  SCROLL_IN,
   LIMIT_GROUP_KEY,
   LIMIT_ITEM_KEY,
   ONFOCUS,
@@ -23,7 +26,7 @@ import {
   LOWCAMEL_ONBLUR
 } from './config';
 
-const scrollingElement = getScrollingElement();
+export const scrollingElement = getScrollingElement();
 // 上一次落焦的元素
 let lastFocusEl: Element | null = null;
 // 上一次的方向
@@ -44,6 +47,8 @@ const EMPTY_ARR = [undefined, null];
 const DIRECTION_ARR = [UP, RIGHT, DOWN, LEFT];
 
 const INFINITY = Infinity;
+// 滚动组历史记录
+export const SCROLL_GROUP_RECORD: { [key: string]: { lastFocus: Element | null } } = {};
 
 export const getCurrFocusEl = () => {
   const { focusClassName, itemAttrname } = defaultConfig;
@@ -151,6 +156,25 @@ export const next = (el: Next) => {
     !sameTarget &&
       (dispatchCustomEvent(target, ONFOCUS), dispatchCustomEvent(target, LOWCAMEL_ONFOCUS));
     setCountAttr && dealCount({ currFocusEl, nextFocusEl: target });
+    const scrollItemKey = target.getAttribute(SCROLL_ITEM_KEY);
+    const scrollGroup = scrollItemKey
+      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollItemKey}"]`)
+      : null;
+    if (scrollItemKey && scrollGroup?.hasAttribute(SCROLL_RECORD_KEY)) {
+      SCROLL_GROUP_RECORD[scrollItemKey] = { lastFocus: target };
+    }
+    const lastScrollItemKey = lastFocusEl?.getAttribute(SCROLL_ITEM_KEY);
+    const lastScrollGroup = lastScrollItemKey
+      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${lastScrollItemKey}"]`)
+      : null;
+    if (lastScrollGroup && scrollItemKey !== lastScrollItemKey) {
+      // 上一个落焦元素是滚动组元素，并且当前落焦元素的 SCROLL_ITEM_KEY 与上一个元素不等，触发滚动组的 scroll-out 事件
+      dispatchCustomEvent(lastScrollGroup, SCROLL_OUT);
+    }
+    if (scrollGroup && scrollItemKey !== lastScrollItemKey) {
+      // 当前落焦元素是滚动组元素，并且上一个落焦元素的 SCROLL_ITEM_KEY 与当前元素不等，触发滚动组的 scroll-in 事件
+      dispatchCustomEvent(scrollGroup, SCROLL_IN);
+    }
     lastFocusEl = target;
     directionFlag = false;
     doAnimate({
@@ -253,7 +277,8 @@ export const getNextFocusEl = (direction: DirectionString) => {
       }
     }
   } else {
-    return (document.querySelector(`[${defaultConfig.itemAttrname}]`) as Element) || null;
+    const LimitGroupEl = getLimitGroupEl();
+    return (LimitGroupEl.querySelector(`[${defaultConfig.itemAttrname}]`) as Element) || null;
   }
 };
 
@@ -447,20 +472,32 @@ export const setDistanceToCenter = (val = true) => {
   defaultConfig.distanceToCenter = val === true;
 };
 
-export const setOffsetDistance = (val: number) => {
+export const setOffsetDistance = (val: number = 50) => {
   defaultConfig.offsetDistanceX = defaultConfig.offsetDistanceY = val;
 };
 
-export const setOffsetDistanceX = (val: number) => {
+export const setOffsetDistanceX = (val: number = 50) => {
   defaultConfig.offsetDistanceX = val;
 };
 
-export const setOffsetDistanceY = (val: number) => {
+export const setOffsetDistanceY = (val: number = 50) => {
   defaultConfig.offsetDistanceY = val;
 };
 
-export const setEndToNext = (val: boolean) => {
+export const setEndToNext = (val: boolean = false) => {
   defaultConfig.endToNext = val;
+};
+
+export const setSmoothTime = (val: number = 800) => {
+  defaultConfig.smoothTime = val;
+};
+
+export const setScrollDelay = (val: number = 0) => {
+  defaultConfig.scrollDelay = val;
+};
+
+export const getDefaultConfig = (key: string) => {
+  return defaultConfig[key];
 };
 
 const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
@@ -494,10 +531,12 @@ const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
     const isIntersected = (() => {
       const leftRight = () =>
         (originTop >= currTop && originTop <= currBottom) ||
-        (originBottom >= currTop && originBottom <= currBottom);
+        (originBottom >= currTop && originBottom <= currBottom) ||
+        (originTop <= currTop && originBottom >= currBottom);
       const upDown = () =>
         (originLeft >= currLeft && originLeft <= currRight) ||
-        (originRight >= currLeft && originRight <= currRight);
+        (originRight >= currLeft && originRight <= currRight) ||
+        (originLeft <= currLeft && originRight >= currRight);
       return {
         left: leftRight,
         right: leftRight,
@@ -672,6 +711,16 @@ const dealScrollGroupFocusElTuple = ({
   originRight: number;
   originBottom: number;
 }) => {
+  const nextScrollGroupVal = el.getAttribute(SCROLL_GROUP_KEY);
+  const nextScrollGroup = nextScrollGroupVal
+    ? document.querySelector(`[${SCROLL_GROUP_KEY}="${nextScrollGroupVal}"]`)
+    : null;
+  if (nextScrollGroup && nextScrollGroup.hasAttribute(SCROLL_RECORD_KEY)) {
+    const lastFocus = SCROLL_GROUP_RECORD[nextScrollGroupVal as string]?.lastFocus;
+    if (lastFocus) {
+      return [sideLen, lastFocus] as [number, HTMLElement];
+    }
+  }
   const scrollGroupElChildren = ArrayFrom(el.querySelectorAll(`[${defaultConfig.itemAttrname}]`));
   const closestEl = [[RIGHT, DOWN].includes(direction) ? INFINITY : -INFINITY, []] as [
     number,

@@ -4,6 +4,7 @@ import type { DefaultConfig } from '../types/config.d';
 export const PARENT_SCROLL_GROUP_KEY = 'parent-scroll-group';
 export const SCROLL_GROUP_KEY = 'scroll-group';
 export const SCROLL_DIRECTION_KEY = 'scroll-direction';
+export const SCROLL_RECORD_KEY = 'scroll-record';
 export const SCROLL_ITEM_KEY = 'scroll-item';
 export const LIMIT_GROUP_KEY = 'limit-group';
 export const LIMIT_ITEM_KEY = 'limit-item';
@@ -21,6 +22,8 @@ export const ENTER = 'enter';
 export const DBLENTER = 'dblenter';
 export const LONGPRESS = 'longpress';
 export const BACK = 'back';
+export const SCROLL_OUT = 'scroll-out';
+export const SCROLL_IN = 'scroll-in';
 
 // 滚动方向
 export const SCROLLTOP = 'scrollTop';
@@ -39,11 +42,12 @@ export const defaultConfig: DefaultConfig = {
   focusedAttrname: 'focused',
   pressedAttrname: 'pressed',
   easing: '',
-  smoothTime: 300,
+  smoothTime: 800,
   offsetDistanceX: 50,
   offsetDistanceY: 50,
   longPressTime: 700,
   dblEnterTime: 200,
+  scrollDelay: 0,
   distanceToCenter: false,
   touchpad: true,
   autoFocus: true,

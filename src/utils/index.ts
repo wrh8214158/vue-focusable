@@ -1,4 +1,4 @@
-import { onLimitChange } from './core';
+import { onLimitChange, SCROLL_GROUP_RECORD } from './core';
 import {
   SCROLL_ITEM_KEY,
   SCROLL_DIRECTION_KEY,
@@ -6,7 +6,8 @@ import {
   LIMIT_GROUP_KEY,
   LIMIT_ITEM_KEY,
   defaultConfig,
-  PARENT_SCROLL_GROUP_KEY
+  PARENT_SCROLL_GROUP_KEY,
+  SCROLL_RECORD_KEY
 } from './config';
 import {
   dealKeydown,
@@ -63,12 +64,17 @@ export const dealFocusable = (el: HTMLElement, value: boolean) => {
   }
 };
 
-export const dealScrollGroup = (el: HTMLElement, value: 'x' | 'y') => {
+export const dealScrollGroup = (
+  el: HTMLElement,
+  value: { direction?: 'x' | 'y'; record?: boolean }
+) => {
   const { itemAttrname } = defaultConfig;
   const scrollDirection = {
     x: 'x',
     y: 'y'
   };
+  const { direction = '', record = true } = value || {};
+  record ? el.setAttribute(SCROLL_RECORD_KEY, '') : el.removeAttribute(SCROLL_RECORD_KEY);
   el.style.overflow = 'auto';
   if (!el.hasAttribute(SCROLL_GROUP_KEY)) {
     scroll_group_count++;
@@ -85,8 +91,16 @@ export const dealScrollGroup = (el: HTMLElement, value: 'x' | 'y') => {
     const item = ITEM_ATTRNAME_ARR[i];
     if (!item.hasAttribute(SCROLL_ITEM_KEY)) {
       item.setAttribute(SCROLL_ITEM_KEY, currScrollGroupCount);
-      scrollDirection[value] && item.setAttribute(SCROLL_DIRECTION_KEY, scrollDirection[value]);
+      scrollDirection[direction] &&
+        item.setAttribute(SCROLL_DIRECTION_KEY, scrollDirection[direction]);
     }
+  }
+};
+
+export const unbindScrollGroup = (el: HTMLElement) => {
+  const scrollGroupKey = el.getAttribute(SCROLL_GROUP_KEY);
+  if (scrollGroupKey) {
+    delete SCROLL_GROUP_RECORD[scrollGroupKey];
   }
 };
 

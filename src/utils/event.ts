@@ -15,6 +15,8 @@ export let touchEl: Element | null = null;
 let enterCount = 0;
 // 滚动时间间隔
 const TIMEOUT = 16.67;
+// 连点方向键的定时器
+let scrollDelayTimer: number | null = null;
 // 定时器
 export const requestAnimationFrame =
   window.requestAnimationFrame || // @ts-expect-error requestAnimationFrame
@@ -148,7 +150,21 @@ export const dealTouchcancel = () => {
 
 const dealDirection = (e: Event, direction: DirectionString) => {
   e.preventDefault();
-  defaultConfig.autoFocus && next(direction);
+  const { scrollDelay } = defaultConfig;
+  const func = () => {
+    defaultConfig.autoFocus && next(direction);
+  };
+  if (scrollDelay) {
+    if (!scrollDelayTimer) {
+      scrollDelayTimer = window.setTimeout(() => {
+        window.clearTimeout(scrollDelayTimer as number);
+        scrollDelayTimer = null;
+        func();
+      }, scrollDelay);
+    }
+  } else {
+    func();
+  }
 };
 
 const dealPressed = (el: Element | null, flag: boolean) => {

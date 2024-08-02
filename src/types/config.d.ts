@@ -15,6 +15,7 @@ export interface DefaultConfig {
   offsetDistanceY: number;
   longPressTime: number;
   dblEnterTime: number;
+  scrollDelay: number;
   distanceToCenter: boolean;
   touchpad: boolean;
   autoFocus: boolean;
