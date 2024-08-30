@@ -1,4 +1,4 @@
-import { defaultConfig } from './utils/config';
+import { defaultConfig, SCROLL_GROUP_KEY } from './utils/config';
 import { getDiffKey, getVueVersion } from './utils/common';
 import type { DefaultConfigPartial } from './types/config.d';
 import {
@@ -22,6 +22,7 @@ import {
   limitGroupElsPush,
   limitGroupElsPop,
   onLimitChange,
+  updateScrollGroupRecord,
   setAutoFocus,
   setDistanceToCenter,
   setOffsetDistance,
@@ -30,7 +31,8 @@ import {
   setSmoothTime,
   setScrollDelay,
   setEndToNext,
-  scrollingElement
+  scrollingElement,
+  SCROLL_GROUP_RECORD
 } from './utils/core';
 
 declare const define: any;
@@ -68,6 +70,11 @@ export const scrollGroup = () => {
     // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
     [_updatedKey](el, binding) {
       dealScrollGroup(el, binding.value);
+      const scrollItemKey = el.getAttribute(SCROLL_GROUP_KEY);
+      const currLastFocus = SCROLL_GROUP_RECORD[scrollItemKey]?.lastFocus;
+      if (currLastFocus && !el.contains(currLastFocus)) {
+        unbindScrollGroup(el);
+      }
     },
     [_unmounted](el) {
       unbindScrollGroup(el);
@@ -131,6 +138,7 @@ if (typeof module === 'object' && module.exports) {
     limitGroupElsPush,
     limitGroupElsPop,
     onLimitChange,
+    updateScrollGroupRecord,
     setAutoFocus,
     setDistanceToCenter,
     setOffsetDistance,
@@ -138,7 +146,8 @@ if (typeof module === 'object' && module.exports) {
     setOffsetDistanceY,
     setSmoothTime,
     setScrollDelay,
-    setEndToNext
+    setEndToNext,
+    scrollingElement
   };
   for (const key in protoFunc) {
     (window as any).VueFocusable.__proto__[key] = protoFunc[key];
@@ -159,6 +168,7 @@ export {
   limitGroupElsPush,
   limitGroupElsPop,
   onLimitChange,
+  updateScrollGroupRecord,
   setAutoFocus,
   setDistanceToCenter,
   setOffsetDistance,

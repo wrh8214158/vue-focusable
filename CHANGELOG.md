@@ -1,3 +1,10 @@
+## 1.3.0 (2024-08-30)
+
+- 全局导出方法增加 `updateScrollGroupRecord`
+- defaultConfig 方法新增 `scrollHiddenTime`，`fps`，去除 `setCountAttr`
+- scrollGroup 指令新增 `focusFirst`，`findFocusType`，`needScrollHidden`，`rootScroll` 参数
+- 底层滚动方法优化，提升性能
+
 ## 1.2.0 (2024-07-26)
 
 ### Bug Fixes

@@ -1,4 +1,3 @@
-import { touchEl } from './event';
 import { animation, scrollStop } from './animation';
 import { ArrayIncludes, ArrayFindIndex, ArrayFrom, getScrollingElement } from './polyfill';
 import { isDom, calculateHypotenuse, dispatchCustomEvent } from './common';
@@ -23,8 +22,16 @@ import {
   SCROLLLEFT,
   PARENT_SCROLL_GROUP_KEY,
   LOWCAMEL_ONFOCUS,
-  LOWCAMEL_ONBLUR
+  LOWCAMEL_ONBLUR,
+  ROOT_SCROLL_KEY,
+  FOCUS_FIRST_KEY,
+  SCROLL_LEFT_HIDDEN_KEY,
+  SCROLL_TOP_HIDDEN_KEY,
+  SCROLL_RIGHT_HIDDEN_KEY,
+  SCROLL_BOTTOM_HIDDEN_KEY,
+  SCROLL_FIND_FOCUS_TYPE_KEY
 } from './config';
+import { cancelAnimationFrame, requestAnimationFrame } from './event';
 
 export const scrollingElement = getScrollingElement();
 // 上一次落焦的元素
@@ -37,8 +44,6 @@ let currDirection = '';
 let counter = 0;
 // next执行的次数
 let directionCount = 0;
-// 是否按方向键的标识
-let directionFlag = false;
 // 限制组元素集合
 let limitGroupEls: Element[] = [];
 
@@ -50,6 +55,8 @@ const INFINITY = Infinity;
 // 滚动组历史记录
 export const SCROLL_GROUP_RECORD: { [key: string]: { lastFocus: Element | null } } = {};
 
+let scrollTimer: number | null = null;
+
 export const getCurrFocusEl = () => {
   const { focusClassName, itemAttrname } = defaultConfig;
   const limitGroup = getLimitGroupEl();
@@ -59,15 +66,21 @@ export const getCurrFocusEl = () => {
 export const getFocusableEls = () => {
   const { itemAttrname } = defaultConfig;
   const limitGroup = getLimitGroupEl();
-  const currFocusEl = getCurrFocusEl();
+  const currFocusEl = currFocusElInfo.el || getCurrFocusEl();
   const scrollItemKey = currFocusEl?.getAttribute(SCROLL_ITEM_KEY);
-  const scrollItemAttr = `[${SCROLL_ITEM_KEY}="${scrollItemKey}"]`;
-  const scrollElGroups = ArrayFrom(
-    limitGroup.querySelectorAll(
-      `[${SCROLL_GROUP_KEY}]:not([${SCROLL_GROUP_KEY}="${scrollItemKey}"])`
-    )
+  const _scrollElGroups = limitGroup.querySelectorAll(
+    `[${SCROLL_GROUP_KEY}]:not([${SCROLL_GROUP_KEY}="${scrollItemKey}"])`
   );
-  const scrollEls = ArrayFrom(limitGroup.querySelectorAll(`[${itemAttrname}]${scrollItemAttr}`));
+  const scrollElGroups: HTMLElement[] = [];
+  for (let i = 0; i < _scrollElGroups.length; i++) {
+    const scrollElGroupItem = _scrollElGroups[i] as HTMLElement;
+    if (scrollElGroupItem.querySelector(`[${itemAttrname}]`)) {
+      scrollElGroups.push(scrollElGroupItem);
+    }
+  }
+  const scrollEls = limitGroup.querySelectorAll(
+    `[${itemAttrname}][${SCROLL_ITEM_KEY}="${scrollItemKey}"]`
+  );
   const otherEls = ArrayFrom(
     limitGroup.querySelectorAll(`[${itemAttrname}]:not([${SCROLL_ITEM_KEY}])`)
   );
@@ -80,21 +93,21 @@ export const getFocusableEls = () => {
 
 export const requestFocus = (el: Next) => next(el);
 
+const currFocusElInfo: { el: Element | null; clientRect: DOMRect | undefined } = {
+  el: null,
+  clientRect: undefined
+};
+
 export const next = (el: Next) => {
-  const {
-    autoFocus,
-    endToNext,
-    focusClassName,
-    focusedAttrname,
-    setCountAttr,
-    easing: defaultEasing
-  } = defaultConfig;
+  const { autoFocus, endToNext, focusClassName, focusedAttrname } = defaultConfig;
   if (!autoFocus || (endToNext ? !scrollStop : false)) {
     directionCount = 0;
     return;
   }
   directionCount++;
-  const currFocusEl = getCurrFocusEl();
+  const currFocusEl = currFocusElInfo.el || getCurrFocusEl();
+  currFocusElInfo.el = currFocusEl;
+  currFocusElInfo.clientRect = currFocusElInfo.clientRect || currFocusEl?.getBoundingClientRect();
   if (ArrayIncludes(DIRECTION_ARR, el as unknown as string)) {
     lastDirection = currDirection;
     currDirection = el as string;
@@ -128,139 +141,97 @@ export const next = (el: Next) => {
       target = currEl as Element;
     }
     const sameTarget = lastFocusEl === target;
-    if (!target.hasAttribute(LIMIT_ITEM_KEY)) {
-      if (currFocusEl) {
+    const blurFunc = () => {
+      if (currFocusEl && target !== lastFocusEl) {
         currFocusEl.classList.remove(focusClassName);
         currFocusEl.removeAttribute(focusedAttrname);
         !sameTarget &&
           (dispatchCustomEvent(currFocusEl, ONBLUR),
           dispatchCustomEvent(currFocusEl, LOWCAMEL_ONBLUR));
       }
+    };
+    if (!target.hasAttribute(LIMIT_ITEM_KEY)) {
+      blurFunc();
     } else {
       const limitItemKey = target.getAttribute(LIMIT_ITEM_KEY);
       const limitGroup = document.querySelector(`[${LIMIT_GROUP_KEY}="${limitItemKey}"]`);
       if (limitGroup) {
-        if (currFocusEl && limitGroup.contains(currFocusEl)) {
-          currFocusEl.classList.remove(focusClassName);
-          currFocusEl.removeAttribute(focusedAttrname);
-          !sameTarget &&
-            (dispatchCustomEvent(currFocusEl, ONBLUR),
-            dispatchCustomEvent(currFocusEl, LOWCAMEL_ONBLUR));
+        if (limitGroup.contains(currFocusEl)) {
+          blurFunc();
         }
       }
     }
     target.classList.add(focusClassName);
     target.setAttribute(focusedAttrname, '');
-    const { smooth, distanceToCenter, smoothTime, end, offsetDistanceX, offsetDistanceY, easing } =
-      config;
     !sameTarget &&
       (dispatchCustomEvent(target, ONFOCUS), dispatchCustomEvent(target, LOWCAMEL_ONFOCUS));
-    setCountAttr && dealCount({ currFocusEl, nextFocusEl: target });
-    const scrollItemKey = target.getAttribute(SCROLL_ITEM_KEY);
-    const scrollGroup = scrollItemKey
-      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollItemKey}"]`)
-      : null;
+    const { scrollItemKey, scrollGroup } = getScrollGroup(target);
     if (scrollItemKey && scrollGroup?.hasAttribute(SCROLL_RECORD_KEY)) {
       SCROLL_GROUP_RECORD[scrollItemKey] = { lastFocus: target };
     }
-    const lastScrollItemKey = lastFocusEl?.getAttribute(SCROLL_ITEM_KEY);
-    const lastScrollGroup = lastScrollItemKey
-      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${lastScrollItemKey}"]`)
-      : null;
-    if (lastScrollGroup && scrollItemKey !== lastScrollItemKey) {
+    const { scrollItemKey: lastScrollItemKey, scrollGroup: lastScrollGroup } =
+      getScrollGroup(lastFocusEl);
+    const scrollKeyNotSame = scrollItemKey !== lastScrollItemKey;
+    const directionData =
+      (lastScrollGroup || scrollGroup) && scrollKeyNotSame && dealDirection(target, lastFocusEl);
+    if (lastScrollGroup && scrollKeyNotSame) {
       // 上一个落焦元素是滚动组元素，并且当前落焦元素的 SCROLL_ITEM_KEY 与上一个元素不等，触发滚动组的 scroll-out 事件
-      dispatchCustomEvent(lastScrollGroup, SCROLL_OUT);
+      dispatchCustomEvent(lastScrollGroup, SCROLL_OUT, directionData);
     }
-    if (scrollGroup && scrollItemKey !== lastScrollItemKey) {
+    if (scrollGroup && scrollKeyNotSame) {
       // 当前落焦元素是滚动组元素，并且上一个落焦元素的 SCROLL_ITEM_KEY 与当前元素不等，触发滚动组的 scroll-in 事件
-      dispatchCustomEvent(scrollGroup, SCROLL_IN);
+      dispatchCustomEvent(scrollGroup, SCROLL_IN, directionData);
     }
+    clearScrollTimer();
+    const doScroll = () => {
+      const {
+        smooth,
+        distanceToCenter,
+        smoothTime,
+        end,
+        offsetDistanceX,
+        offsetDistanceY,
+        easing
+      } = config;
+      doAnimate({
+        focusEl: target,
+        scrollEl: scrollGroup,
+        smooth,
+        smoothTime,
+        end,
+        easing,
+        distanceToCenter,
+        offsetDistanceX,
+        offsetDistanceY
+      });
+      dealScrollGroupAnimate({
+        focusEl: target,
+        smooth,
+        smoothTime,
+        end,
+        easing,
+        distanceToCenter,
+        offsetDistanceX,
+        offsetDistanceY
+      });
+      clearScrollTimer();
+      currFocusElInfo.el = null;
+      currFocusElInfo.clientRect = undefined;
+    };
+    scrollTimer = requestAnimationFrame(doScroll);
     lastFocusEl = target;
-    directionFlag = false;
-    doAnimate({
-      focusEl: target,
-      smooth,
-      smoothTime,
-      end,
-      easing: easing || defaultEasing,
-      distanceToCenter,
-      offsetDistanceX,
-      offsetDistanceY
-    });
-    dealScrollGroupAnimate({
-      focusEl: target,
-      smooth,
-      smoothTime,
-      end,
-      distanceToCenter,
-      offsetDistanceX,
-      offsetDistanceY
-    });
-  }
-};
-
-const dealScrollGroupAnimate = ({
-  focusEl,
-  scrollEl = null,
-  smooth,
-  smoothTime,
-  end,
-  distanceToCenter,
-  offsetDistanceX,
-  offsetDistanceY
-}: {
-  focusEl: Element | null;
-  scrollEl?: Element | null;
-  smooth?: boolean;
-  smoothTime?: number;
-  end?: () => void;
-  distanceToCenter?: boolean;
-  offsetDistanceX?: number;
-  offsetDistanceY?: number;
-}) => {
-  const scrollItemKey = focusEl?.getAttribute(SCROLL_ITEM_KEY);
-  const currFocusEl =
-    (scrollItemKey ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollItemKey}"]`) : null) ||
-    focusEl;
-  const parentScrollGroupKey = currFocusEl?.getAttribute(PARENT_SCROLL_GROUP_KEY);
-  const currScrollEl =
-    (parentScrollGroupKey
-      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${parentScrollGroupKey}"]`)
-      : null) || scrollEl;
-  if (currScrollEl) {
-    doAnimate({
-      focusEl: currFocusEl,
-      scrollEl: currScrollEl,
-      smooth,
-      smoothTime,
-      end,
-      distanceToCenter,
-      offsetDistanceX,
-      offsetDistanceY
-    });
-    const LimitGroupEl = getLimitGroupEl();
-    dealScrollGroupAnimate({
-      focusEl: currScrollEl,
-      scrollEl: currScrollEl === LimitGroupEl ? null : LimitGroupEl,
-      smooth,
-      smoothTime,
-      end,
-      distanceToCenter,
-      offsetDistanceX,
-      offsetDistanceY
-    });
   }
 };
 
 export const getNextFocusEl = (direction: DirectionString) => {
-  const currFocusEl = getCurrFocusEl();
-  const { scrollElGroups, scrollEls, otherEls } = getFocusableEls();
+  const currFocusEl = currFocusElInfo.el || getCurrFocusEl();
   if (currFocusEl) {
     switch (direction) {
       case LEFT:
       case RIGHT:
       case UP:
       case DOWN: {
+        const { scrollElGroups, scrollEls, otherEls } = getFocusableEls();
         return (
           dealIntersectedEl({ currFocusEl, focusableEls: scrollEls, direction }) ||
           dealIntersectedEl({
@@ -309,27 +280,34 @@ export const doAnimate = ({
     distanceToCenter: sDistanceToCenter
   } = defaultConfig;
   const {
-    offsetLeft: focusOffsetLeft = 0,
-    offsetTop: focusOffsetTop = 0,
-    offsetWidth: focusOffsetWidth = 0,
-    offsetHeight: focusOffsetHeight = 0
-  } = focusEl as HTMLElement;
+    left: focusElLeft = 0,
+    top: focusElTop = 0,
+    bottom: focusElBottom = 0,
+    right: focusElRight = 0,
+    width: focusElWidth = 0,
+    height: focusElHeight = 0
+  } = (currFocusElInfo.el === focusEl ? currFocusElInfo.clientRect : null) ||
+  (focusEl as HTMLElement).getBoundingClientRect();
   const currScrollEl = (scrollEl || limitGroupEls.slice(-1)[0] || getScrollEl()) as HTMLElement;
   const {
-    offsetLeft: scrollOffsetLeft = 0,
-    offsetTop: scrollOffsetTop = 0,
-    offsetWidth: scrollOffsetWidth = 0,
-    offsetHeight: scrollOffsetHeight = 0,
     scrollLeft: currScrollElScrollLeft = 0,
     scrollTop: currScrollElScrollTop = 0,
-    scrollHeight: scrollScrollHeight = 0,
-    scrollWidth: scrollScrollWidth = 0
+    scrollWidth: currScrollElScrollWidth = 0,
+    scrollHeight: currScrollElScrollHeight = 0
   } = currScrollEl;
+  const {
+    left: currScrollElLeft = 0,
+    top: currScrollElTop = 0,
+    bottom: currScrollElBottom = 0,
+    right: currScrollElRight = 0,
+    width: currScrollElWidth = 0,
+    height: currScrollElHeight = 0
+  } = currScrollEl.getBoundingClientRect();
   const { offsetDistanceDx, offsetDistanceDy } = (
     (ArrayIncludes(EMPTY_ARR, distanceToCenter) ? sDistanceToCenter : distanceToCenter)
       ? {
-          offsetDistanceDx: (scrollOffsetWidth - focusOffsetWidth) / 2,
-          offsetDistanceDy: (scrollOffsetHeight - focusOffsetHeight) / 2
+          offsetDistanceDx: (currScrollElWidth - focusElWidth) / 2,
+          offsetDistanceDy: (currScrollElHeight - focusElHeight) / 2
         }
       : {
           offsetDistanceDx: ArrayIncludes(EMPTY_ARR, offsetDistanceX)
@@ -341,88 +319,81 @@ export const doAnimate = ({
         }
   ) as { offsetDistanceDx: number; offsetDistanceDy: number };
   if (
-    focusOffsetTop - currScrollElScrollTop - offsetDistanceDy < scrollOffsetTop &&
-    currScrollElScrollTop > 0
+    focusElTop + focusElHeight / 2 + (currScrollElTop + currScrollElScrollTop) <
+    offsetDistanceDy
   ) {
     // 上
-    runAnimate({
-      scrollEl: currScrollEl,
-      scrollType: SCROLLTOP,
-      smooth,
-      smoothTime,
-      end,
-      easing,
-      from: currScrollElScrollTop,
-      to: focusOffsetTop - scrollOffsetTop - offsetDistanceDy
-    });
-  }
-  if (
-    focusOffsetLeft - currScrollElScrollLeft - offsetDistanceDx < scrollOffsetLeft &&
-    currScrollElScrollLeft > 0
-  ) {
-    // 左
-    runAnimate({
-      scrollEl: currScrollEl,
-      scrollType: SCROLLLEFT,
-      smooth,
-      smoothTime,
-      end,
-      easing,
-      from: currScrollElScrollLeft,
-      to: focusOffsetLeft - scrollOffsetLeft - offsetDistanceDx
-    });
-  }
-  if (
-    focusOffsetLeft - currScrollElScrollLeft + focusOffsetWidth + offsetDistanceDx >
-      scrollOffsetLeft + scrollOffsetWidth &&
-    currScrollElScrollLeft < scrollScrollWidth - scrollOffsetWidth
-  ) {
-    // 右
-    runAnimate({
-      scrollEl: currScrollEl,
-      scrollType: SCROLLLEFT,
-      smooth,
-      smoothTime,
-      end,
-      easing,
-      from: currScrollElScrollLeft,
-      to:
-        focusOffsetLeft +
-        focusOffsetWidth +
-        offsetDistanceDx -
-        (scrollOffsetLeft + scrollOffsetWidth)
-    });
-  }
-  if (
-    focusOffsetTop - currScrollElScrollTop + focusOffsetHeight + offsetDistanceDy >
-      scrollOffsetTop + scrollOffsetHeight &&
-    currScrollElScrollTop < scrollScrollHeight - scrollOffsetHeight
+    if (currScrollElScrollTop) {
+      runAnimate({
+        scrollEl: currScrollEl,
+        scrollType: SCROLLTOP,
+        smooth,
+        smoothTime,
+        end,
+        easing,
+        from: currScrollElScrollTop,
+        to:
+          focusElTop - currScrollElTop - offsetDistanceDy + currScrollElScrollTop + currScrollElTop
+      });
+    }
+  } else if (
+    focusElTop + focusElHeight / 2 + (currScrollElTop + currScrollElScrollTop) >
+    offsetDistanceDy
   ) {
     // 下
-    runAnimate({
-      scrollEl: currScrollEl,
-      scrollType: SCROLLTOP,
-      smooth,
-      smoothTime,
-      end,
-      easing,
-      from: currScrollElScrollTop,
-      to:
-        focusOffsetTop +
-        focusOffsetHeight +
-        offsetDistanceDy -
-        (scrollOffsetTop + scrollOffsetHeight)
-    });
+    if (currScrollElScrollHeight - currScrollElScrollTop > currScrollElHeight) {
+      runAnimate({
+        scrollEl: currScrollEl,
+        scrollType: SCROLLTOP,
+        smooth,
+        smoothTime,
+        end,
+        easing,
+        from: currScrollElScrollTop,
+        to:
+          focusElBottom -
+          currScrollElBottom +
+          offsetDistanceDy +
+          currScrollElScrollTop +
+          currScrollElTop
+      });
+    }
+  }
+  if (focusElLeft + currScrollElLeft < offsetDistanceDx) {
+    // 左
+    if (currScrollElScrollLeft) {
+      runAnimate({
+        scrollEl: currScrollEl,
+        scrollType: SCROLLLEFT,
+        smooth,
+        smoothTime,
+        end,
+        easing,
+        from: currScrollElScrollLeft,
+        to: focusElLeft - currScrollElLeft - offsetDistanceDx + currScrollElScrollLeft
+      });
+    }
+  } else if (currScrollElRight - focusElRight < offsetDistanceDx) {
+    // 右
+    if (currScrollElScrollWidth - currScrollElScrollLeft > currScrollElWidth) {
+      runAnimate({
+        scrollEl: currScrollEl,
+        scrollType: SCROLLLEFT,
+        smooth,
+        smoothTime,
+        end,
+        easing,
+        from: currScrollElScrollLeft,
+        to: focusElRight - currScrollElRight + offsetDistanceDx + currScrollElScrollLeft
+      });
+    }
   }
 };
 
 // 获取当前焦点元素所在块的滚动父元素
 export const getScrollEl = () => {
-  const currFocusEl = getCurrFocusEl();
-  const scrollGroupKey = currFocusEl?.getAttribute(SCROLL_ITEM_KEY);
-  const scrollGroup = scrollGroupKey
-    ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollGroupKey}"]`)
-    : null;
+  const currFocusEl = currFocusElInfo.el || getCurrFocusEl();
+  const { scrollGroup } = getScrollGroup(currFocusEl);
   return scrollGroup || scrollingElement;
 };
 
@@ -464,6 +435,28 @@ export const onLimitChange = (el: HTMLElement, val: boolean) => {
   }
 };
 
+export const updateScrollGroupRecord = ({ key, el }) => {
+  if (key in SCROLL_GROUP_RECORD) {
+    SCROLL_GROUP_RECORD[key] = { lastFocus: el };
+  }
+};
+
+export const setHiddenAttr = (el: HTMLElement) => {
+  const { scrollLeft, scrollTop, scrollWidth, scrollHeight, clientWidth, clientHeight } = el;
+  scrollLeft
+    ? el.setAttribute(SCROLL_LEFT_HIDDEN_KEY, '')
+    : el.removeAttribute(SCROLL_LEFT_HIDDEN_KEY);
+  scrollTop
+    ? el.setAttribute(SCROLL_TOP_HIDDEN_KEY, '')
+    : el.removeAttribute(SCROLL_TOP_HIDDEN_KEY);
+  clientWidth + scrollLeft < scrollWidth
+    ? el.setAttribute(SCROLL_RIGHT_HIDDEN_KEY, '')
+    : el.removeAttribute(SCROLL_RIGHT_HIDDEN_KEY);
+  clientHeight + scrollTop < scrollHeight
+    ? el.setAttribute(SCROLL_BOTTOM_HIDDEN_KEY, '')
+    : el.removeAttribute(SCROLL_BOTTOM_HIDDEN_KEY);
+};
+
 export const setAutoFocus = (val = true) => {
   defaultConfig.autoFocus = val === true;
 };
@@ -500,6 +493,123 @@ export const getDefaultConfig = (key: string) => {
   return defaultConfig[key];
 };
 
+const clearScrollTimer = () => {
+  cancelAnimationFrame(scrollTimer as number);
+  scrollTimer = null;
+};
+
+const dealDirection = (target, lastFocusEl) => {
+  if (!lastFocusEl || !target) {
+    return {};
+  } else {
+    const {
+      top: targetTop,
+      left: targetLeft,
+      bottom: targetBottom,
+      right: targetRight
+    } = currFocusElInfo.clientRect || target.getBoundingClientRect();
+    const {
+      top: lastTop,
+      left: lastLeft,
+      bottom: lastBottom,
+      right: lastRight
+    } = lastFocusEl.getBoundingClientRect();
+    let directionArr: string[] = [];
+    if (targetTop < lastTop) {
+      directionArr.push(UP);
+    } else if (targetBottom > lastBottom) {
+      directionArr.push(DOWN);
+    }
+    if (targetLeft < lastLeft) {
+      directionArr.push(LEFT);
+    } else if (targetRight > lastRight) {
+      directionArr.push(RIGHT);
+    }
+    return {
+      directionArr
+    };
+  }
+};
+
+const getScrollGroup = (el) => {
+  const scrollItemKey = el?.getAttribute(SCROLL_ITEM_KEY) || '';
+  return {
+    scrollItemKey,
+    scrollGroup: scrollItemKey
+      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollItemKey}"]`)
+      : null
+  };
+};
+
+const dealScrollGroupAnimate = ({
+  focusEl,
+  scrollEl = null,
+  smooth,
+  smoothTime,
+  end,
+  easing,
+  distanceToCenter,
+  offsetDistanceX,
+  offsetDistanceY
+}: {
+  focusEl: Element | null;
+  scrollEl?: Element | null;
+  smooth?: boolean;
+  smoothTime?: number;
+  end?: () => void;
+  easing?: string | ((val: any) => any);
+  distanceToCenter?: boolean;
+  offsetDistanceX?: number;
+  offsetDistanceY?: number;
+}) => {
+  const { scrollGroup } = getScrollGroup(focusEl);
+  const currFocusEl = scrollGroup || focusEl;
+  const parentScrollGroupKey = currFocusEl?.getAttribute(PARENT_SCROLL_GROUP_KEY);
+  const currScrollEl =
+    (parentScrollGroupKey
+      ? document.querySelector(`[${SCROLL_GROUP_KEY}="${parentScrollGroupKey}"]`)
+      : null) || scrollEl;
+  if (currScrollEl) {
+    doAnimate({
+      focusEl: currFocusEl,
+      scrollEl: currScrollEl,
+      smooth,
+      smoothTime,
+      end,
+      easing,
+      distanceToCenter,
+      offsetDistanceX,
+      offsetDistanceY
+    });
+    const LimitGroupEl = getLimitGroupEl();
+    dealScrollGroupAnimate({
+      focusEl: currScrollEl,
+      scrollEl: currScrollEl === LimitGroupEl ? null : LimitGroupEl,
+      smooth,
+      smoothTime,
+      end,
+      easing,
+      distanceToCenter,
+      offsetDistanceX,
+      offsetDistanceY
+    });
+  } else {
+    if (currFocusEl?.getAttribute(ROOT_SCROLL_KEY) !== 'false') {
+      doAnimate({
+        focusEl: currFocusEl,
+        scrollEl: scrollingElement,
+        smooth,
+        smoothTime,
+        end,
+        easing,
+        distanceToCenter,
+        offsetDistanceX,
+        offsetDistanceY
+      });
+    }
+  }
+};
+
 const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
   const { itemAttrname } = defaultConfig;
   const {
@@ -507,110 +617,111 @@ const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
     right: originRight,
     bottom: originBottom,
     left: originLeft
-  } = currFocusEl.getBoundingClientRect();
+  } = currFocusElInfo.clientRect || currFocusEl.getBoundingClientRect();
   // 有相交的下一个元素元组
   let intersectedFinalFocusElTuple: [number, Element | null] = [INFINITY, null];
   // 无相交的下一个元素元组
   let notIntersectedFinalFocusElTuple: [number, Element | null] = [INFINITY, null];
   for (let i = 0; i < focusableEls.length; i++) {
     const el = focusableEls[i];
-    const {
-      top: currTop,
-      right: currRight,
-      bottom: currBottom,
-      left: currLeft,
-      width: currWidth,
-      height: currHeight
-    } = el.getBoundingClientRect();
-    const sameSideMap = {
-      left: currLeft < originLeft,
-      right: currRight > originRight,
-      up: currTop < originTop,
-      down: currBottom > originBottom
-    };
-    const isIntersected = (() => {
-      const leftRight = () =>
-        (originTop >= currTop && originTop <= currBottom) ||
-        (originBottom >= currTop && originBottom <= currBottom) ||
-        (originTop <= currTop && originBottom >= currBottom);
-      const upDown = () =>
-        (originLeft >= currLeft && originLeft <= currRight) ||
-        (originRight >= currLeft && originRight <= currRight) ||
-        (originLeft <= currLeft && originRight >= currRight);
-      return {
-        left: leftRight,
-        right: leftRight,
-        up: upDown,
-        down: upDown
-      }[direction]();
-    })();
-    if (el !== currFocusEl && currWidth && currHeight && sameSideMap[direction]) {
-      const { abs, min } = Math;
-      const upDownMinB = () =>
-        min(
-          abs(originLeft - currLeft),
-          abs(originLeft - currRight),
-          abs(originRight - currLeft),
-          abs(originRight - currRight)
-        );
-      const leftRightMinB = () =>
-        min(
-          abs(originTop - currTop),
-          abs(originTop - currBottom),
-          abs(originBottom - currTop),
-          abs(originBottom - currBottom)
-        );
-      const { a, b } = (() => {
-        if (direction === UP) {
-          return {
-            a: min(abs(originTop - currBottom)),
-            b: upDownMinB()
-          };
-        } else if (direction === RIGHT) {
-          return {
-            a: min(abs(originRight - currLeft)),
-            b: leftRightMinB()
-          };
-        } else if (direction === DOWN) {
-          return {
-            a: min(abs(originBottom - currTop)),
-            b: upDownMinB()
-          };
-        } else if (direction === LEFT) {
-          return {
-            a: min(abs(originLeft - currRight)),
-            b: leftRightMinB()
-          };
-        }
-      })() as { a: number; b: number };
-      // 斜边长
-      const sideLen = calculateHypotenuse(a, b);
-      if (isIntersected) {
-        // 相交
-        if (sideLen < intersectedFinalFocusElTuple[0]) {
-          const isAvailableScrollGroup =
-            el.hasAttribute(SCROLL_GROUP_KEY) && !el.hasAttribute(itemAttrname)
-              ? el.querySelector(`[${itemAttrname}]`)
-              : false;
-          intersectedFinalFocusElTuple = isAvailableScrollGroup
-            ? dealScrollGroupFocusElTuple({
-                sideLen,
-                el,
-                currFocusEl,
-                direction,
-                originTop,
-                originLeft,
-                originRight,
-                originBottom
-              })
-            : [sideLen, el];
-        }
-      } else {
-        if (intersectedFinalFocusElTuple[0] === INFINITY) {
-          // 如果相交里有值，则不再计算不相交的值
-          if (sideLen < notIntersectedFinalFocusElTuple[0]) {
-            if (!el.hasAttribute(SCROLL_GROUP_KEY)) {
-              notIntersectedFinalFocusElTuple = [sideLen, el];
+    if (el !== currFocusEl) {
+      const {
+        top: currTop,
+        right: currRight,
+        bottom: currBottom,
+        left: currLeft,
+        width: currWidth,
+        height: currHeight
+      } = el.getBoundingClientRect();
+      const sameSideMap = {
+        left: currLeft < originLeft,
+        right: currRight > originRight,
+        up: currTop < originTop,
+        down: currBottom > originBottom
+      };
+      const isIntersected = (() => {
+        const leftRight = () =>
+          (originTop >= currTop && originTop <= currBottom) ||
+          (originBottom >= currTop && originBottom <= currBottom) ||
+          (originTop <= currTop && originBottom >= currBottom);
+        const upDown = () =>
+          (originLeft >= currLeft && originLeft <= currRight) ||
+          (originRight >= currLeft && originRight <= currRight) ||
+          (originLeft <= currLeft && originRight >= currRight);
+        return {
+          left: leftRight,
+          right: leftRight,
+          up: upDown,
+          down: upDown
+        }[direction]();
+      })();
+      if (currWidth && currHeight && sameSideMap[direction]) {
+        const { abs, min } = Math;
+        const upDownMinB = () =>
+          min(
+            abs(originLeft - currLeft),
+            abs(originLeft - currRight),
+            abs(originRight - currLeft),
+            abs(originRight - currRight)
+          );
+        const leftRightMinB = () =>
+          min(
+            abs(originTop - currTop),
+            abs(originTop - currBottom),
+            abs(originBottom - currTop),
+            abs(originBottom - currBottom)
+          );
+        const { a, b } = (() => {
+          switch (direction) {
+            case UP:
+              return {
+                a: abs(originTop - currBottom),
+                b: upDownMinB()
+              };
+            case RIGHT:
+              return {
+                a: abs(originRight - currLeft),
+                b: leftRightMinB()
+              };
+            case DOWN:
+              return {
+                a: abs(originBottom - currTop),
+                b: upDownMinB()
+              };
+            case LEFT:
+              return {
+                a: abs(originLeft - currRight),
+                b: leftRightMinB()
+              };
+          }
+        })() as { a: number; b: number };
+        // 斜边长
+        const sideLen = calculateHypotenuse(a, b);
+        if (isIntersected) {
+          // 相交
+          if (sideLen < intersectedFinalFocusElTuple[0]) {
+            const isAvailableScrollGroup =
+              el.hasAttribute(SCROLL_GROUP_KEY) && !el.hasAttribute(itemAttrname);
+            intersectedFinalFocusElTuple = isAvailableScrollGroup
+              ? dealScrollGroupFocusElTuple({
+                  sideLen,
+                  el,
+                  currFocusEl,
+                  direction,
+                  originTop,
+                  originLeft,
+                  originRight,
+                  originBottom
+                })
+              : [sideLen, el];
+          }
+        } else {
+          if (intersectedFinalFocusElTuple[0] === INFINITY) {
+            // 如果相交里有值，则不再计算不相交的值
+            if (sideLen < notIntersectedFinalFocusElTuple[0]) {
+              if (!el.hasAttribute(SCROLL_GROUP_KEY)) {
+                notIntersectedFinalFocusElTuple = [sideLen, el];
+              }
             }
           }
         }
@@ -622,59 +733,74 @@ const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
     x: [LEFT, RIGHT],
     y: [UP, DOWN]
   };
+  const { scrollGroup } = getScrollGroup(currFocusEl);
+  const scrollFindFocusTypeIntersected =
+    scrollGroup?.getAttribute(SCROLL_FIND_FOCUS_TYPE_KEY) === '0';
+  const intersectedEl = intersectedFinalFocusElTuple[1];
+  const notIntersectedEl = notIntersectedFinalFocusElTuple[1];
   return (
     (ArrayIncludes(limitDirection[scrollDirection] || [], direction)
-      ? intersectedFinalFocusElTuple[1]
-      : intersectedFinalFocusElTuple[1] || notIntersectedFinalFocusElTuple[1]) || null
+      ? intersectedEl
+      : scrollFindFocusTypeIntersected
+      ? intersectedEl
+      : intersectedEl || notIntersectedEl) || null
   );
 };
 
+const animationObj = {};
+
 const runAnimate = ({ scrollEl, scrollType, smooth, smoothTime, end, easing, from, to }) => {
-  const { smoothTime: sSmoothTime } = defaultConfig;
-  animation({
+  const { smoothTime: sSmoothTime, fps } = defaultConfig;
+  const animationScrollEl = animationObj[scrollEl];
+  if (animationScrollEl) {
+    if (animationScrollEl[scrollType]) {
+      // 清除动画
+      animationScrollEl[scrollType]();
+    }
+    animationScrollEl[scrollType] = null;
+  } else {
+    animationObj[scrollEl] = {
+      [scrollType]: null
+    };
+  }
+  const isEndFunc = typeof end === 'function';
+  const { cancel } = animation({
     from,
     to,
     easing,
     duration: smooth ? (ArrayIncludes(EMPTY_ARR, smoothTime) ? sSmoothTime : smoothTime) : 0,
     type: scrollType,
+    fps,
     update: (obj) => {
-      if (scrollType in scrollEl) {
-        scrollEl[scrollType] = obj[scrollType];
-        obj.end && typeof end === 'function' && end();
+      scrollEl[scrollType] = obj[scrollType];
+      if (obj.end) {
+        if (animationScrollEl) {
+          delete animationScrollEl[scrollType];
+          !Object.keys(animationScrollEl).length && delete animationObj[scrollEl];
+        }
+        isEndFunc && end();
       }
     }
   });
+  animationObj[scrollEl] && (animationObj[scrollEl][scrollType] = cancel);
 };
 
 const nextInNext = ({ currFocusEl, nextFocusEl, direction }) => {
-  currFocusEl === nextFocusEl && lastDirection === direction ? counter++ : (counter = 0);
+  if (currFocusEl === nextFocusEl) {
+    lastDirection === direction ? counter++ : (counter = 1);
+  } else {
+    counter = 0;
+  }
   const prevCount = directionCount;
   currFocusEl && dispatchCustomEvent(currFocusEl, direction, { count: counter });
   const nextCount = directionCount;
   directionCount = 0;
-  directionFlag = prevCount === nextCount;
-  return !directionFlag;
-};
-
-const dealCount = ({ currFocusEl, nextFocusEl }) => {
-  const flag = currFocusEl === nextFocusEl;
-  if (flag && !touchEl) {
-    for (let i = 0; i < DIRECTION_ARR.length; i++) {
-      const item = DIRECTION_ARR[i];
-      currFocusEl.removeAttribute(`${item}-count`);
-    }
-    currFocusEl.removeAttribute(`${currDirection}-count`);
-    currFocusEl.offsetWidth;
-    currFocusEl.setAttribute(`${currDirection}-count`, '');
-  }
+  return prevCount !== nextCount;
 };
 
 const dealScrollDirection = ({ currFocusEl, nextFocusEl, direction }) => {
   const scrollDirection = currFocusEl?.getAttribute(SCROLL_DIRECTION_KEY) || '';
-  const scrollItem = currFocusEl?.getAttribute(SCROLL_ITEM_KEY) || '';
-  const scrollGroup = scrollItem
-    ? document.querySelector(`[${SCROLL_GROUP_KEY}="${scrollItem}"]`)
-    : null;
+  const { scrollGroup } = getScrollGroup(currFocusEl);
   switch (scrollDirection) {
     case 'x': {
       return ArrayIncludes([LEFT, RIGHT], direction) && !scrollGroup?.contains(nextFocusEl)
@@ -719,15 +845,26 @@ const dealScrollGroupFocusElTuple = ({
     const lastFocus = SCROLL_GROUP_RECORD[nextScrollGroupVal as string]?.lastFocus;
     if (lastFocus) {
       return [sideLen, lastFocus] as [number, HTMLElement];
+    } else {
+      if (el.hasAttribute(FOCUS_FIRST_KEY)) {
+        const firstFocusEls = el.querySelectorAll(`[${defaultConfig.itemAttrname}]`);
+        for (let i = 0; i < firstFocusEls.length; i++) {
+          const item = firstFocusEls[i];
+          const { clientWidth, clientHeight } = item;
+          if (clientWidth && clientHeight) {
+            return [sideLen, item] as [number, HTMLElement];
+          }
+        }
+      }
     }
   }
-  const scrollGroupElChildren = ArrayFrom(el.querySelectorAll(`[${defaultConfig.itemAttrname}]`));
-  const closestEl = [[RIGHT, DOWN].includes(direction) ? INFINITY : -INFINITY, []] as [
+  const scrollGroupElChildren = el.querySelectorAll(`[${defaultConfig.itemAttrname}]`);
+  const closestEl = [ArrayIncludes([RIGHT, DOWN], direction) ? INFINITY : -INFINITY, []] as [
     number,
     HTMLElement[]
   ];
   for (let i = 0; i < scrollGroupElChildren.length; i++) {
-    const item = scrollGroupElChildren[i];
+    const item = scrollGroupElChildren[i] as HTMLElement;
     const { top, bottom, left, right } = item.getBoundingClientRect();
     switch (direction) {
       case UP: {

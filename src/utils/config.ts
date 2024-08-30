@@ -2,9 +2,16 @@ import type { DefaultConfig } from '../types/config.d';
 
 // 滚动组和限制组属性名
 export const PARENT_SCROLL_GROUP_KEY = 'parent-scroll-group';
+export const FOCUS_FIRST_KEY = 'focus-first';
+export const SCROLL_FIND_FOCUS_TYPE_KEY = 'find-focus-type';
 export const SCROLL_GROUP_KEY = 'scroll-group';
 export const SCROLL_DIRECTION_KEY = 'scroll-direction';
 export const SCROLL_RECORD_KEY = 'scroll-record';
+export const SCROLL_RIGHT_HIDDEN_KEY = 'scroll-right-hidden';
+export const SCROLL_BOTTOM_HIDDEN_KEY = 'scroll-bottom-hidden';
+export const SCROLL_LEFT_HIDDEN_KEY = 'scroll-left-hidden';
+export const SCROLL_TOP_HIDDEN_KEY = 'scroll-top-hidden';
+export const ROOT_SCROLL_KEY = 'root-scroll';
 export const SCROLL_ITEM_KEY = 'scroll-item';
 export const LIMIT_GROUP_KEY = 'limit-group';
 export const LIMIT_ITEM_KEY = 'limit-item';
@@ -48,9 +55,10 @@ export const defaultConfig: DefaultConfig = {
   longPressTime: 700,
   dblEnterTime: 200,
   scrollDelay: 0,
+  scrollHiddenTime: 200,
+  fps: false,
   distanceToCenter: false,
   touchpad: true,
   autoFocus: true,
-  setCountAttr: true,
   endToNext: false
 };

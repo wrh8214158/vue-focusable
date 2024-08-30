@@ -23,7 +23,10 @@ export default defineConfig({
     terserOptions: {
       compress: {
         pure_funcs: ['console.log'], // 只删除 console.log
-        drop_debugger: true
+        drop_debugger: true,
+        pure_getters: true,
+        unsafe: true,
+        passes: 3 // 进行多次传递以进一步压缩代码
       },
       format: {
         comments: false // 删除所有注释

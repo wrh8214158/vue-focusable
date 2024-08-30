@@ -9,17 +9,18 @@ export interface DefaultConfig {
   focusClassName: string;
   focusedAttrname: string;
   pressedAttrname: string;
-  easing: string | ((val: any) => any);
+  easing: string | ((val?: any) => any);
   smoothTime: number;
   offsetDistanceX: number;
   offsetDistanceY: number;
   longPressTime: number;
   dblEnterTime: number;
   scrollDelay: number;
+  scrollHiddenTime: number;
+  fps: number | boolean;
   distanceToCenter: boolean;
   touchpad: boolean;
   autoFocus: boolean;
-  setCountAttr: boolean;
   endToNext: boolean;
 }
 

@@ -1,12 +1,12 @@
 import { UP, DOWN, LEFT, RIGHT, ENTER, BACK, defaultConfig } from './config';
 import { ArrayIncludes } from './polyfill';
+import { requestAnimationFrame } from './event';
 
 const DEFAULT_VERSION = 2;
 let vueVersion = DEFAULT_VERSION;
 
-export const getVueVersion = (Vue) => {
-  return (vueVersion = (Vue.version && +Vue.version.split('.')[0]) || DEFAULT_VERSION);
-};
+export const getVueVersion = (Vue) =>
+  (vueVersion = (Vue.version && +Vue.version.split('.')[0]) || DEFAULT_VERSION);
 
 export const getDiffKey = () => {
   if (vueVersion >= 3) {
@@ -24,16 +24,13 @@ export const getDiffKey = () => {
   }
 };
 
-export const isDom = (el: Element) => {
-  return el && el.nodeType === Node.ELEMENT_NODE;
-};
+export const isDom = (el: Element) => el && el.nodeType === Node.ELEMENT_NODE;
 
-export const calculateHypotenuse = (a: number = 0, b: number = 0) => {
-  return Math.sqrt(a * a + b * b);
-};
+export const calculateHypotenuse = (a: number = 0, b: number = 0) => Math.sqrt(a * a + b * b);
 
 export const dispatchCustomEvent = (el: EventTarget, eventName = '', detail = {} as any) => {
-  el.dispatchEvent(createCustomEvent(eventName, detail));
+  const patchEvent = () => el.dispatchEvent(createCustomEvent(eventName, detail));
+  requestAnimationFrame(patchEvent);
 };
 
 export const createCustomEvent = (name: string, detail = {}) => {
@@ -67,5 +64,12 @@ export const getKey = (e: KeyboardEvent | TouchEvent) => {
   return eventName;
 };
 
-export const getDataType = (data: any) =>
-  Object.prototype.toString.call(data).replace('[object ', '').replace(']', '');
+export const debounce = (func: (val?: any) => any, delay: number) => {
+  let timer;
+  return (args) => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      func.apply(this, args);
+    }, delay);
+  };
+};

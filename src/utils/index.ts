@@ -1,4 +1,4 @@
-import { onLimitChange, SCROLL_GROUP_RECORD } from './core';
+import { onLimitChange, setHiddenAttr, SCROLL_GROUP_RECORD } from './core';
 import {
   SCROLL_ITEM_KEY,
   SCROLL_DIRECTION_KEY,
@@ -7,7 +7,10 @@ import {
   LIMIT_ITEM_KEY,
   defaultConfig,
   PARENT_SCROLL_GROUP_KEY,
-  SCROLL_RECORD_KEY
+  SCROLL_RECORD_KEY,
+  FOCUS_FIRST_KEY,
+  SCROLL_FIND_FOCUS_TYPE_KEY,
+  ROOT_SCROLL_KEY
 } from './config';
 import {
   dealKeydown,
@@ -17,7 +20,8 @@ import {
   dealTouchend,
   dealTouchcancel
 } from './event';
-import { ArrayFrom, ArrayIncludes } from './polyfill';
+import { ArrayIncludes } from './polyfill';
+import { debounce } from './common';
 
 let scroll_group_count = -1;
 let limit_group_count = -1;
@@ -66,27 +70,50 @@ export const dealFocusable = (el: HTMLElement, value: boolean) => {
 
 export const dealScrollGroup = (
   el: HTMLElement,
-  value: { direction?: 'x' | 'y'; record?: boolean }
+  value: {
+    direction?: 'x' | 'y';
+    record?: boolean;
+    focusFirst?: boolean;
+    findFocusType?: number;
+    needScrollHidden?: boolean;
+    rootScroll?: boolean;
+  }
 ) => {
-  const { itemAttrname } = defaultConfig;
+  const { itemAttrname, scrollHiddenTime } = defaultConfig;
   const scrollDirection = {
     x: 'x',
     y: 'y'
   };
-  const { direction = '', record = true } = value || {};
+  const {
+    direction = '',
+    record = true,
+    focusFirst = false,
+    findFocusType = 1,
+    needScrollHidden = false,
+    rootScroll = true
+  } = value || {};
   record ? el.setAttribute(SCROLL_RECORD_KEY, '') : el.removeAttribute(SCROLL_RECORD_KEY);
+  focusFirst ? el.setAttribute(FOCUS_FIRST_KEY, '') : el.removeAttribute(FOCUS_FIRST_KEY);
+  findFocusType === 0
+    ? el.setAttribute(SCROLL_FIND_FOCUS_TYPE_KEY, '0')
+    : el.removeAttribute(SCROLL_FIND_FOCUS_TYPE_KEY);
+  rootScroll ? el.removeAttribute(ROOT_SCROLL_KEY) : el.setAttribute(ROOT_SCROLL_KEY, 'false');
   el.style.overflow = 'auto';
+  if (needScrollHidden) {
+    setHiddenAttr(el);
+    el.onscroll = debounce(() => setHiddenAttr(el), scrollHiddenTime);
+  }
   if (!el.hasAttribute(SCROLL_GROUP_KEY)) {
     scroll_group_count++;
     el.setAttribute(SCROLL_GROUP_KEY, String(scroll_group_count));
   }
   const currScrollGroupCount = el.getAttribute(SCROLL_GROUP_KEY) || '';
-  const SCROLL_GROUP_KEY_ARR = ArrayFrom(el.querySelectorAll(`[${SCROLL_GROUP_KEY}]`));
+  const SCROLL_GROUP_KEY_ARR = el.querySelectorAll(`[${SCROLL_GROUP_KEY}]`);
   for (let i = 0; i < SCROLL_GROUP_KEY_ARR.length; i++) {
     const item = SCROLL_GROUP_KEY_ARR[i];
     item.setAttribute(PARENT_SCROLL_GROUP_KEY, currScrollGroupCount);
   }
-  const ITEM_ATTRNAME_ARR = ArrayFrom(el.querySelectorAll(`[${itemAttrname}]`));
+  const ITEM_ATTRNAME_ARR = el.querySelectorAll(`[${itemAttrname}]`);
   for (let i = 0; i < ITEM_ATTRNAME_ARR.length; i++) {
     const item = ITEM_ATTRNAME_ARR[i];
     if (!item.hasAttribute(SCROLL_ITEM_KEY)) {
@@ -111,7 +138,7 @@ export const dealLimitGroup = (el: HTMLElement, value: boolean) => {
     el.setAttribute(`${LIMIT_GROUP_KEY}`, String(limit_group_count));
   }
   const currLimitGroupCount = el.getAttribute(LIMIT_GROUP_KEY) || '';
-  const ITEM_ATTRNAME_ARR = ArrayFrom(el.querySelectorAll(`[${itemAttrname}]`));
+  const ITEM_ATTRNAME_ARR = el.querySelectorAll(`[${itemAttrname}]`);
   for (let i = 0; i < ITEM_ATTRNAME_ARR.length; i++) {
     const item = ITEM_ATTRNAME_ARR[i];
     if (!item.hasAttribute(LIMIT_ITEM_KEY)) {

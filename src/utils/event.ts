@@ -14,9 +14,11 @@ export let touchEl: Element | null = null;
 // 点击的执行次数
 let enterCount = 0;
 // 滚动时间间隔
-const TIMEOUT = 16.67;
-// 连点方向键的定时器
+export const TIMEOUT = 16.67;
+// 连点定时器
 let scrollDelayTimer: number | null = null;
+// 连点方向键的限制定时器
+let scrollLimitTimer: number | null = null;
 // 定时器
 export const requestAnimationFrame =
   window.requestAnimationFrame || // @ts-expect-error requestAnimationFrame
@@ -25,7 +27,7 @@ export const requestAnimationFrame =
   window.oRequestAnimationFrame || // @ts-expect-error oRequestAnimationFrame
   window.msRequestAnimationFrame ||
   function (callback) {
-    window.setTimeout(callback, TIMEOUT);
+    return window.setTimeout(callback, TIMEOUT);
   };
 // 取消定时器
 export const cancelAnimationFrame =
@@ -35,7 +37,7 @@ export const cancelAnimationFrame =
   window.oCancelAnimationFrame || // @ts-expect-error oCancelAnimationFrame
   window.msCancelAnimationFrame ||
   function (callback) {
-    window.clearTimeout(callback);
+    return window.clearTimeout(callback);
   };
 
 export const dealKeydown = (e: KeyboardEvent) => {
@@ -150,22 +152,26 @@ export const dealTouchcancel = () => {
 
 const dealDirection = (e: Event, direction: DirectionString) => {
   e.preventDefault();
-  const { scrollDelay } = defaultConfig;
-  const func = () => {
-    defaultConfig.autoFocus && next(direction);
-  };
-  if (scrollDelay) {
-    if (!scrollDelayTimer) {
-      scrollDelayTimer = window.setTimeout(() => {
-        window.clearTimeout(scrollDelayTimer as number);
-        scrollDelayTimer = null;
-        func();
-      }, scrollDelay);
+  clearScrollDelayTimer();
+  const doScroll = () => {
+    const { scrollDelay } = defaultConfig;
+    if (scrollDelay) {
+      if (!scrollLimitTimer) {
+        scrollLimitTimer = window.setTimeout(() => {
+          directionNext(direction);
+          window.clearTimeout(scrollLimitTimer as number);
+          scrollLimitTimer = null;
+        }, scrollDelay);
+      }
+    } else {
+      directionNext(direction);
     }
-  } else {
-    func();
-  }
+    clearScrollDelayTimer();
+  };
+  scrollDelayTimer = requestAnimationFrame(doScroll);
 };
+
+const directionNext = (direction: DirectionString) => defaultConfig.autoFocus && next(direction);
 
 const dealPressed = (el: Element | null, flag: boolean) => {
   const currFocusEl = el || getCurrFocusEl();
@@ -180,9 +186,7 @@ const dealPressed = (el: Element | null, flag: boolean) => {
   return currFocusEl;
 };
 
-const dealBack = () => {
-  dispatchCustomEvent(document, BACK);
-};
+const dealBack = () => dispatchCustomEvent(document, BACK);
 
 const longpress = () => {
   const currFocusEl = getCurrFocusEl();
@@ -204,6 +208,11 @@ const clearDblenterTimer = () => {
   clearTimeout(dblenterTimer as number);
   dblenterTimer = null;
   enterCount = 0;
+};
+
+const clearScrollDelayTimer = () => {
+  cancelAnimationFrame(scrollDelayTimer as number);
+  scrollDelayTimer = null;
 };
 
 const dealEnter = () => {

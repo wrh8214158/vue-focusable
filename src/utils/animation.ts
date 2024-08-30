@@ -1,4 +1,4 @@
-import { requestAnimationFrame } from './event';
+import { requestAnimationFrame, cancelAnimationFrame } from './event';
 
 /*
  * Tween.js
@@ -189,48 +189,79 @@ export let scrollStop = true;
 /**
  * @description 对运动方法进行封装，让Tween.js缓动算法更容易理解和使用
  */
-export const animation = ({ from, to, duration, easing = 'Quart.easeOut', type, update }) => {
-  const start = Date.now();
-  const easingFunc = (() => {
-    if (typeof easing === 'function') {
-      return easing;
-    } else if (typeof easing === 'string') {
-      const easingArr = easing.split('.');
-      let func = Tween;
-      for (let i = 0; i < easingArr.length; i++) {
-        const item = easingArr[i];
-        if (func[item]) {
-          func = func[item];
-        } else {
-          func = Tween;
-          break;
-        }
-      }
-      return func === Tween ? Tween.Quart.easeOut : func;
-    } else {
-      console.error('Illegal value');
-      return Tween.Quart.easeOut;
-    }
-  })() as any;
+export const animation = ({ from, to, duration, easing = 'Quart.easeOut', type, update, fps }) => {
+  const easingFunc = getEasing(easing);
+  let start = Date.now();
+  let after = start;
+  let timer: any = null;
+  const fpsLimit = fps && typeof fps === 'number';
   const step = () => {
-    const now = Date.now();
-    const progress = now - start;
-    if (progress < duration) {
-      scrollStop = false;
-      const value = easingFunc(progress, from, to - from, duration);
-      update({
-        end: false,
-        [type]: value
-      });
-      requestAnimationFrame(step);
+    if (duration) {
+      const now = Date.now();
+      const progress = now - start;
+      if (progress < duration) {
+        timer = requestAnimationFrame(step);
+        scrollStop = false;
+        if (fpsLimit) {
+          const fpsInterval = 1000 / fps;
+          const delta = now - after;
+          if (delta > fpsInterval) {
+            after = now - (delta % fpsInterval);
+            update({
+              end: false,
+              [type]: easingFunc(progress, from, to - from, duration)
+            });
+          }
+        } else {
+          update({
+            end: false,
+            [type]: easingFunc(progress, from, to - from, duration)
+          });
+        }
+      } else {
+        clearAnimationTimer(timer);
+        scrollStop = true;
+        update({
+          end: true,
+          [type]: easingFunc(duration, from, to - from, duration)
+        });
+      }
     } else {
-      scrollStop = true;
-      const value = easingFunc(duration, from, to - from, duration);
       update({
         end: true,
-        [type]: value
+        [type]: to
       });
     }
   };
   step();
+  return {
+    cancel: () => clearAnimationTimer(timer)
+  };
+};
+
+const getEasing = (easing = ''): any => {
+  if (typeof easing === 'string') {
+    const easingArr = easing.split('.');
+    let func = Tween;
+    for (let i = 0; i < easingArr.length; i++) {
+      const item = easingArr[i];
+      if (func[item]) {
+        func = func[item];
+      } else {
+        func = Tween;
+        break;
+      }
+    }
+    return func === Tween ? Tween.Quart.easeOut : func;
+  } else if (typeof easing === 'function') {
+    return easing as (val?: any) => any;
+  } else {
+    console.error('Illegal value');
+    return Tween.Quart.easeOut;
+  }
+};
+
+const clearAnimationTimer = (timer) => {
+  cancelAnimationFrame(timer);
+  timer = null;
 };
