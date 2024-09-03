@@ -204,16 +204,18 @@ export const next = (el: Next) => {
         offsetDistanceX,
         offsetDistanceY
       });
-      dealScrollGroupAnimate({
-        focusEl: target,
-        smooth,
-        smoothTime,
-        end,
-        easing,
-        distanceToCenter,
-        offsetDistanceX,
-        offsetDistanceY
-      });
+      if (scrollGroup || limitGroupEls.slice(-1)[0]) {
+        dealScrollGroupAnimate({
+          focusEl: target,
+          smooth,
+          smoothTime,
+          end,
+          easing,
+          distanceToCenter,
+          offsetDistanceX,
+          offsetDistanceY
+        });
+      }
       clearScrollTimer();
       currFocusElInfo.el = null;
       currFocusElInfo.clientRect = undefined;
@@ -282,8 +284,6 @@ export const doAnimate = ({
   const {
     left: focusElLeft = 0,
     top: focusElTop = 0,
-    bottom: focusElBottom = 0,
-    right: focusElRight = 0,
     width: focusElWidth = 0,
     height: focusElHeight = 0
   } = (currFocusElInfo.el === focusEl ? currFocusElInfo.clientRect : null) ||
@@ -298,8 +298,6 @@ export const doAnimate = ({
   const {
     left: currScrollElLeft = 0,
     top: currScrollElTop = 0,
-    bottom: currScrollElBottom = 0,
-    right: currScrollElRight = 0,
     width: currScrollElWidth = 0,
     height: currScrollElHeight = 0
   } = currScrollEl.getBoundingClientRect();
@@ -318,10 +316,7 @@ export const doAnimate = ({
             : offsetDistanceY
         }
   ) as { offsetDistanceDx: number; offsetDistanceDy: number };
-  if (
-    focusElTop + focusElHeight / 2 + (currScrollElTop + currScrollElScrollTop) <
-    offsetDistanceDy
-  ) {
+  if (focusElTop - currScrollElTop - currScrollElScrollTop < offsetDistanceDy) {
     // 上
     if (currScrollElScrollTop) {
       runAnimate({
@@ -332,16 +327,12 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollTop,
-        to:
-          focusElTop - currScrollElTop - offsetDistanceDy + currScrollElScrollTop + currScrollElTop
+        to: focusElTop - offsetDistanceDy + currScrollElScrollTop
       });
     }
-  } else if (
-    focusElTop + focusElHeight / 2 + (currScrollElTop + currScrollElScrollTop) >
-    offsetDistanceDy
-  ) {
+  } else if (focusElTop - currScrollElTop - currScrollElScrollTop > offsetDistanceDy) {
     // 下
-    if (currScrollElScrollHeight - currScrollElScrollTop > currScrollElHeight) {
+    if (currScrollElScrollTop + currScrollElHeight < currScrollElScrollHeight) {
       runAnimate({
         scrollEl: currScrollEl,
         scrollType: SCROLLTOP,
@@ -350,16 +341,11 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollTop,
-        to:
-          focusElBottom -
-          currScrollElBottom +
-          offsetDistanceDy +
-          currScrollElScrollTop +
-          currScrollElTop
+        to: focusElTop - offsetDistanceDy + currScrollElScrollTop
       });
     }
   }
-  if (focusElLeft + currScrollElLeft < offsetDistanceDx) {
+  if (focusElLeft - currScrollElLeft - currScrollElScrollLeft < offsetDistanceDx) {
     // 左
     if (currScrollElScrollLeft) {
       runAnimate({
@@ -370,12 +356,12 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollLeft,
-        to: focusElLeft - currScrollElLeft - offsetDistanceDx + currScrollElScrollLeft
+        to: focusElLeft - offsetDistanceDx + currScrollElScrollLeft
       });
     }
-  } else if (currScrollElRight - focusElRight < offsetDistanceDx) {
+  } else if (focusElLeft - currScrollElLeft - currScrollElScrollLeft > offsetDistanceDx) {
     // 右
-    if (currScrollElScrollWidth - currScrollElScrollLeft > currScrollElWidth) {
+    if (currScrollElScrollLeft + currScrollElWidth < currScrollElScrollWidth) {
       runAnimate({
         scrollEl: currScrollEl,
         scrollType: SCROLLLEFT,
@@ -384,7 +370,7 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollLeft,
-        to: focusElRight - currScrollElRight + offsetDistanceDx + currScrollElScrollLeft
+        to: focusElLeft - offsetDistanceDx + currScrollElScrollLeft
       });
     }
   }
@@ -742,8 +728,8 @@ const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
     (ArrayIncludes(limitDirection[scrollDirection] || [], direction)
       ? intersectedEl
       : scrollFindFocusTypeIntersected
-      ? intersectedEl
-      : intersectedEl || notIntersectedEl) || null
+        ? intersectedEl
+        : intersectedEl || notIntersectedEl) || null
   );
 };
 
