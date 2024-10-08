@@ -35,7 +35,7 @@ import { cancelAnimationFrame, requestAnimationFrame } from './event';
 
 export const scrollingElement = getScrollingElement();
 // 上一次落焦的元素
-let lastFocusEl: Element | null = null;
+export let lastFocusEl: Element | null = null;
 // 上一次的方向
 let lastDirection = '';
 // 当前方向
@@ -46,6 +46,11 @@ let counter = 0;
 let directionCount = 0;
 // 限制组元素集合
 let limitGroupEls: Element[] = [];
+// 记录当前焦点元素的信息
+const currFocusElInfo: { el: Element | null; clientRect: DOMRect | undefined } = {
+  el: null,
+  clientRect: undefined
+};
 
 const EMPTY_ARR = [undefined, null];
 
@@ -93,13 +98,8 @@ export const getFocusableEls = () => {
 
 export const requestFocus = (el: Next) => next(el);
 
-const currFocusElInfo: { el: Element | null; clientRect: DOMRect | undefined } = {
-  el: null,
-  clientRect: undefined
-};
-
 export const next = (el: Next) => {
-  const { autoFocus, endToNext, focusClassName, focusedAttrname } = defaultConfig;
+  const { autoFocus, endToNext, focusClassName, focusedAttrname, itemAttrname } = defaultConfig;
   if (!autoFocus || (endToNext ? !scrollStop : false)) {
     directionCount = 0;
     return;
@@ -141,23 +141,43 @@ export const next = (el: Next) => {
       target = currEl as Element;
     }
     const sameTarget = lastFocusEl === target;
-    const blurFunc = () => {
-      if (currFocusEl && target !== lastFocusEl) {
+    const blurFunc = ({ isLimitGroup, currGroup }) => {
+      if (currFocusEl && !sameTarget) {
         currFocusEl.classList.remove(focusClassName);
         currFocusEl.removeAttribute(focusedAttrname);
-        !sameTarget &&
-          (dispatchCustomEvent(currFocusEl, ONBLUR),
-          dispatchCustomEvent(currFocusEl, LOWCAMEL_ONBLUR));
+        dispatchCustomEvent(currFocusEl, ONBLUR);
+        dispatchCustomEvent(currFocusEl, LOWCAMEL_ONBLUR);
+      }
+      const limitGroupEl = getLimitGroupEl();
+      if (!limitGroupEl.contains(target)) {
+        const groupFocusEl = currGroup.querySelector(
+          isLimitGroup
+            ? `.${focusClassName}[${itemAttrname}]`
+            : `.${focusClassName}[${itemAttrname}]:not([${LIMIT_ITEM_KEY}])`
+        );
+        if (groupFocusEl) {
+          groupFocusEl.classList.remove(focusClassName);
+          groupFocusEl.removeAttribute(focusedAttrname);
+        }
       }
     };
-    if (!target.hasAttribute(LIMIT_ITEM_KEY)) {
-      blurFunc();
+    const limitItemKey = target.getAttribute(LIMIT_ITEM_KEY);
+    if (!limitItemKey) {
+      const limitGroup = getLimitGroupEl();
+      if (limitGroup.contains(target)) {
+        blurFunc({
+          isLimitGroup: false,
+          currGroup: scrollingElement
+        });
+      }
     } else {
-      const limitItemKey = target.getAttribute(LIMIT_ITEM_KEY);
       const limitGroup = document.querySelector(`[${LIMIT_GROUP_KEY}="${limitItemKey}"]`);
       if (limitGroup) {
         if (limitGroup.contains(currFocusEl)) {
-          blurFunc();
+          blurFunc({
+            isLimitGroup: true,
+            currGroup: limitGroup
+          });
         }
       }
     }
@@ -293,14 +313,12 @@ export const doAnimate = ({
     scrollLeft: currScrollElScrollLeft = 0,
     scrollTop: currScrollElScrollTop = 0,
     scrollWidth: currScrollElScrollWidth = 0,
-    scrollHeight: currScrollElScrollHeight = 0
+    scrollHeight: currScrollElScrollHeight = 0,
+    offsetTop: currScrollElOffsetTop = 0,
+    offsetLeft: currScrollElOffsetLeft = 0
   } = currScrollEl;
-  const {
-    left: currScrollElLeft = 0,
-    top: currScrollElTop = 0,
-    width: currScrollElWidth = 0,
-    height: currScrollElHeight = 0
-  } = currScrollEl.getBoundingClientRect();
+  const { width: currScrollElWidth = 0, height: currScrollElHeight = 0 } =
+    currScrollEl.getBoundingClientRect();
   const { offsetDistanceDx, offsetDistanceDy } = (
     (ArrayIncludes(EMPTY_ARR, distanceToCenter) ? sDistanceToCenter : distanceToCenter)
       ? {
@@ -316,7 +334,7 @@ export const doAnimate = ({
             : offsetDistanceY
         }
   ) as { offsetDistanceDx: number; offsetDistanceDy: number };
-  if (focusElTop - currScrollElTop - currScrollElScrollTop < offsetDistanceDy) {
+  if (focusElTop - currScrollElOffsetTop - currScrollElScrollTop < offsetDistanceDy) {
     // 上
     if (currScrollElScrollTop) {
       runAnimate({
@@ -327,10 +345,10 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollTop,
-        to: focusElTop - offsetDistanceDy + currScrollElScrollTop
+        to: focusElTop - currScrollElOffsetTop - offsetDistanceDy + currScrollElScrollTop
       });
     }
-  } else if (focusElTop - currScrollElTop - currScrollElScrollTop > offsetDistanceDy) {
+  } else if (focusElTop - currScrollElOffsetTop - currScrollElScrollTop > offsetDistanceDy) {
     // 下
     if (currScrollElScrollTop + currScrollElHeight < currScrollElScrollHeight) {
       runAnimate({
@@ -341,11 +359,11 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollTop,
-        to: focusElTop - offsetDistanceDy + currScrollElScrollTop
+        to: focusElTop - currScrollElOffsetTop - offsetDistanceDy + currScrollElScrollTop
       });
     }
   }
-  if (focusElLeft - currScrollElLeft - currScrollElScrollLeft < offsetDistanceDx) {
+  if (focusElLeft - currScrollElOffsetLeft - currScrollElScrollLeft < offsetDistanceDx) {
     // 左
     if (currScrollElScrollLeft) {
       runAnimate({
@@ -356,10 +374,10 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollLeft,
-        to: focusElLeft - offsetDistanceDx + currScrollElScrollLeft
+        to: focusElLeft - currScrollElOffsetLeft - offsetDistanceDx + currScrollElScrollLeft
       });
     }
-  } else if (focusElLeft - currScrollElLeft - currScrollElScrollLeft > offsetDistanceDx) {
+  } else if (focusElLeft - currScrollElOffsetLeft - currScrollElScrollLeft > offsetDistanceDx) {
     // 右
     if (currScrollElScrollLeft + currScrollElWidth < currScrollElScrollWidth) {
       runAnimate({
@@ -370,7 +388,7 @@ export const doAnimate = ({
         end,
         easing,
         from: currScrollElScrollLeft,
-        to: focusElLeft - offsetDistanceDx + currScrollElScrollLeft
+        to: focusElLeft - currScrollElOffsetLeft - offsetDistanceDx + currScrollElScrollLeft
       });
     }
   }
@@ -417,6 +435,11 @@ export const onLimitChange = (el: HTMLElement, val: boolean) => {
         currFocusEl.removeAttribute(focusedAttrname);
       }
       limitGroupEls.splice(currLimitGroupIndex, 1);
+      const limitGroupEl = getLimitGroupEl();
+      const focusEl = limitGroupEl.querySelector(`.${focusClassName}[${itemAttrname}]`);
+      lastFocusEl = focusEl;
+      currFocusElInfo.el = focusEl;
+      currFocusElInfo.clientRect = focusEl?.getBoundingClientRect?.();
     }
   }
 };
@@ -478,6 +501,8 @@ export const setScrollDelay = (val: number = 0) => {
 export const getDefaultConfig = (key: string) => {
   return defaultConfig[key];
 };
+
+export const resetCounter = () => (counter = 0);
 
 const clearScrollTimer = () => {
   cancelAnimationFrame(scrollTimer as number);
@@ -773,7 +798,7 @@ const runAnimate = ({ scrollEl, scrollType, smooth, smoothTime, end, easing, fro
 
 const nextInNext = ({ currFocusEl, nextFocusEl, direction }) => {
   if (currFocusEl === nextFocusEl) {
-    lastDirection === direction ? counter++ : (counter = 1);
+    lastDirection === direction ? counter++ : (counter = 0);
   } else {
     counter = 0;
   }

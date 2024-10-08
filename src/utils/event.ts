@@ -1,5 +1,5 @@
 import { UP, DOWN, LEFT, RIGHT, ENTER, DBLENTER, LONGPRESS, BACK, defaultConfig } from './config';
-import { getCurrFocusEl, next } from './core';
+import { getCurrFocusEl, lastFocusEl, next } from './core';
 import { dispatchCustomEvent, getKey } from './common';
 import type { DirectionString } from '../types/core.d';
 
@@ -128,14 +128,16 @@ export const dealTouchend = (e: TouchEvent) => {
     const pressEl = (touchEl && dealPressed(touchEl, false)) || null;
     if (target.hasAttribute(itemAttrname)) {
       if (touchEl && touchEl === pressEl) {
-        enterCount++;
-        if (isLongPress) {
-          clearDblenterTimer();
-        } else {
-          if (dblEnterTime) {
-            !dblenterTimer && (dblenterTimer = window.setTimeout(dealEnter, dblEnterTime));
+        if (lastFocusEl === target) {
+          enterCount++;
+          if (isLongPress) {
+            clearDblenterTimer();
           } else {
-            enter();
+            if (dblEnterTime) {
+              !dblenterTimer && (dblenterTimer = window.setTimeout(dealEnter, dblEnterTime));
+            } else {
+              enter();
+            }
           }
         }
         next(touchEl);

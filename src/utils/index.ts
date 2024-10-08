@@ -55,7 +55,7 @@ export const initEvent = () => {
   ];
   for (let i = 0; i < arr.length; i++) {
     const { eventName, event } = arr[i] as { eventName: string; event: any };
-    document.addEventListener(eventName, event);
+    document.addEventListener(eventName, event, false);
   }
 };
 

@@ -17,8 +17,8 @@ export const getDiffKey = () => {
     };
   } else {
     return {
-      mountedKey: 'inserted',
-      updatedKey: 'update',
+      mountedKey: 'bind',
+      updatedKey: 'componentUpdated',
       unmountedKey: 'unbind'
     };
   }

@@ -31,6 +31,7 @@ import {
   setSmoothTime,
   setScrollDelay,
   setEndToNext,
+  resetCounter,
   scrollingElement,
   SCROLL_GROUP_RECORD
 } from './utils/core';
@@ -91,6 +92,9 @@ export const limitGroup = () => {
     // 在绑定元素的父组件，及他自己的所有子节点都更新后调用
     [_updatedKey](el, binding) {
       dealLimitGroup(el, binding.value);
+    },
+    [_unmounted](el) {
+      onLimitChange(el, false);
     }
   };
 };
@@ -147,6 +151,7 @@ if (typeof module === 'object' && module.exports) {
     setSmoothTime,
     setScrollDelay,
     setEndToNext,
+    resetCounter,
     scrollingElement
   };
   for (const key in protoFunc) {
@@ -177,6 +182,7 @@ export {
   setSmoothTime,
   setScrollDelay,
   setEndToNext,
+  resetCounter,
   scrollingElement
 };
 

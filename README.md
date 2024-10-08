@@ -124,7 +124,7 @@ APP.mount('#app');
     <script type="text/javascript" src="https://unpkg.com/vue@2.7.14/dist/vue.min.js"></script>
     <script
       type="text/javascript"
-      src="https://unpkg.com/vue-focusable@1.3.0/lib/index.umd.cjs"
+      src="https://unpkg.com/vue-focusable@1.3.2/lib/index.umd.cjs"
     ></script>
     <script type="text/javascript">
       Vue.use(
@@ -260,6 +260,7 @@ APP.mount('#app');
 | `setSmoothTime`                   | 设置滚动持续时间                                          | Number                                                                                                                                                                                                                                                                                                                                                                                      | void                 |
 | `setScrollDelay`                  | 设置快速点击或者按住方向键时的响应时间                    | Number                                                                                                                                                                                                                                                                                                                                                                                      | 0                    |
 | `setEndToNext`                    | 设置是否当前元素滚动结束后再继续下一个焦点落焦            | Boolean                                                                                                                                                                                                                                                                                                                                                                                     | false                |
+| `resetCounter`                    | 重置方向键计数器                                          |                                                                                                                                                                                                                                                                                                                                                                                             |                      |
 | `scrollingElement`                | 全局的滚动元素（常量，非函数）                            | Element                                                                                                                                                                                                                                                                                                                                                                                     |                      |
 
 事件：
