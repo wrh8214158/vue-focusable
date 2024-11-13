@@ -15,6 +15,7 @@ export const ROOT_SCROLL_KEY = 'root-scroll';
 export const SCROLL_ITEM_KEY = 'scroll-item';
 export const LIMIT_GROUP_KEY = 'limit-group';
 export const LIMIT_ITEM_KEY = 'limit-item';
+export const NO_SCROLL_KEY = 'non-scrollable';
 
 // 事件名映射
 export const ONFOCUS = 'on-focus';

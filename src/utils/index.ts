@@ -131,7 +131,7 @@ export const unbindScrollGroup = (el: HTMLElement) => {
   }
 };
 
-export const dealLimitGroup = (el: HTMLElement, value: boolean) => {
+export const dealLimitGroup = (el: HTMLElement, value: boolean = true) => {
   const { itemAttrname } = defaultConfig;
   if (!el.hasAttribute(LIMIT_GROUP_KEY)) {
     limit_group_count++;

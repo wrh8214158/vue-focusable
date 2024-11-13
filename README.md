@@ -124,7 +124,7 @@ APP.mount('#app');
     <script type="text/javascript" src="https://unpkg.com/vue@2.7.14/dist/vue.min.js"></script>
     <script
       type="text/javascript"
-      src="https://unpkg.com/vue-focusable@1.3.2/lib/index.umd.cjs"
+      src="https://unpkg.com/vue-focusable@1.3.3/lib/index.umd.cjs"
     ></script>
     <script type="text/javascript">
       Vue.use(
@@ -151,6 +151,8 @@ APP.mount('#app');
   <div v-focusable>按钮</div>
 </template>
 ```
+
+> 注：要设置落焦不自动滚动，可在 v-focusable 元素上设置属性 non-scrollable
 
 ```html
 <!-- 限制焦点寻找区域为 v-limit-group 所在的元素 -->

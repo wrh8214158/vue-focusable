@@ -113,6 +113,7 @@ export const dealTouchmove = () => {
 };
 
 export const dealTouchend = (e: TouchEvent) => {
+  e.preventDefault();
   const { touchpad, itemAttrname, dblEnterTime } = defaultConfig;
   if (touchpad) {
     clearLongPressTimer();

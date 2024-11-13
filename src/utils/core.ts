@@ -29,7 +29,8 @@ import {
   SCROLL_TOP_HIDDEN_KEY,
   SCROLL_RIGHT_HIDDEN_KEY,
   SCROLL_BOTTOM_HIDDEN_KEY,
-  SCROLL_FIND_FOCUS_TYPE_KEY
+  SCROLL_FIND_FOCUS_TYPE_KEY,
+  NO_SCROLL_KEY
 } from './config';
 import { cancelAnimationFrame, requestAnimationFrame } from './event';
 
@@ -134,52 +135,25 @@ export const next = (el: Next) => {
     if (ArrayIncludes(DIRECTION_ARR, currEl as unknown as string)) {
       lastDirection = currDirection;
       currDirection = currEl as unknown as string;
-      const nextFocusEl = getNextFocusEl(el as DirectionString);
+      const nextFocusEl = getNextFocusEl(currEl as unknown as DirectionString);
       nextInNext({ currFocusEl, nextFocusEl, direction: el });
       target = nextFocusEl;
     } else {
       target = currEl as Element;
     }
     const sameTarget = lastFocusEl === target;
-    const blurFunc = ({ isLimitGroup, currGroup }) => {
-      if (currFocusEl && !sameTarget) {
-        currFocusEl.classList.remove(focusClassName);
-        currFocusEl.removeAttribute(focusedAttrname);
-        dispatchCustomEvent(currFocusEl, ONBLUR);
-        dispatchCustomEvent(currFocusEl, LOWCAMEL_ONBLUR);
-      }
-      const limitGroupEl = getLimitGroupEl();
-      if (!limitGroupEl.contains(target)) {
-        const groupFocusEl = currGroup.querySelector(
-          isLimitGroup
-            ? `.${focusClassName}[${itemAttrname}]`
-            : `.${focusClassName}[${itemAttrname}]:not([${LIMIT_ITEM_KEY}])`
-        );
-        if (groupFocusEl) {
-          groupFocusEl.classList.remove(focusClassName);
-          groupFocusEl.removeAttribute(focusedAttrname);
-        }
-      }
-    };
     const limitItemKey = target.getAttribute(LIMIT_ITEM_KEY);
-    if (!limitItemKey) {
-      const limitGroup = getLimitGroupEl();
-      if (limitGroup.contains(target)) {
-        blurFunc({
-          isLimitGroup: false,
-          currGroup: scrollingElement
-        });
-      }
-    } else {
-      const limitGroup = document.querySelector(`[${LIMIT_GROUP_KEY}="${limitItemKey}"]`);
-      if (limitGroup) {
-        if (limitGroup.contains(currFocusEl)) {
-          blurFunc({
-            isLimitGroup: true,
-            currGroup: limitGroup
-          });
-        }
-      }
+    const oldLimitItemKey = lastFocusEl?.getAttribute(LIMIT_ITEM_KEY);
+    const focusEl = document.querySelector(
+      `.${focusClassName}[${itemAttrname}]${
+        limitItemKey ? `[${LIMIT_ITEM_KEY}]` : `:not([${LIMIT_ITEM_KEY}])`
+      }`
+    );
+    if (focusEl && !sameTarget && limitItemKey === oldLimitItemKey) {
+      focusEl.classList.remove(focusClassName);
+      focusEl.removeAttribute(focusedAttrname);
+      dispatchCustomEvent(focusEl, ONBLUR);
+      dispatchCustomEvent(focusEl, LOWCAMEL_ONBLUR);
     }
     target.classList.add(focusClassName);
     target.setAttribute(focusedAttrname, '');
@@ -194,7 +168,11 @@ export const next = (el: Next) => {
     const scrollKeyNotSame = scrollItemKey !== lastScrollItemKey;
     const directionData =
       (lastScrollGroup || scrollGroup) && scrollKeyNotSame && dealDirection(target, lastFocusEl);
-    if (lastScrollGroup && scrollKeyNotSame) {
+    if (
+      lastScrollGroup &&
+      scrollKeyNotSame &&
+      (lastFocusEl ? !lastFocusEl.classList.contains(focusClassName) : true)
+    ) {
       // 上一个落焦元素是滚动组元素，并且当前落焦元素的 SCROLL_ITEM_KEY 与上一个元素不等，触发滚动组的 scroll-out 事件
       dispatchCustomEvent(lastScrollGroup, SCROLL_OUT, directionData);
     }
@@ -202,31 +180,23 @@ export const next = (el: Next) => {
       // 当前落焦元素是滚动组元素，并且上一个落焦元素的 SCROLL_ITEM_KEY 与当前元素不等，触发滚动组的 scroll-in 事件
       dispatchCustomEvent(scrollGroup, SCROLL_IN, directionData);
     }
-    clearScrollTimer();
-    const doScroll = () => {
-      const {
-        smooth,
-        distanceToCenter,
-        smoothTime,
-        end,
-        offsetDistanceX,
-        offsetDistanceY,
-        easing
-      } = config;
-      doAnimate({
-        focusEl: target,
-        scrollEl: scrollGroup,
-        smooth,
-        smoothTime,
-        end,
-        easing,
-        distanceToCenter,
-        offsetDistanceX,
-        offsetDistanceY
-      });
-      if (scrollGroup || limitGroupEls.slice(-1)[0]) {
-        dealScrollGroupAnimate({
+    if (target.hasAttribute(NO_SCROLL_KEY)) {
+      lastFocusEl = target;
+    } else {
+      clearScrollTimer();
+      const doScroll = () => {
+        const {
+          smooth,
+          distanceToCenter,
+          smoothTime,
+          end,
+          offsetDistanceX,
+          offsetDistanceY,
+          easing
+        } = config;
+        doAnimate({
           focusEl: target,
+          scrollEl: scrollGroup,
           smooth,
           smoothTime,
           end,
@@ -235,13 +205,26 @@ export const next = (el: Next) => {
           offsetDistanceX,
           offsetDistanceY
         });
-      }
-      clearScrollTimer();
-      currFocusElInfo.el = null;
-      currFocusElInfo.clientRect = undefined;
-    };
-    scrollTimer = requestAnimationFrame(doScroll);
-    lastFocusEl = target;
+        if (scrollGroup || limitGroupEls.slice(-1)[0]) {
+          dealScrollGroupAnimate({
+            focusEl: target,
+            smooth,
+            smoothTime,
+            end,
+            easing,
+            distanceToCenter,
+            offsetDistanceX,
+            offsetDistanceY
+          });
+        }
+        clearScrollTimer();
+        lastFocusEl = target;
+      };
+      doScroll();
+      scrollTimer = requestAnimationFrame(doScroll);
+    }
+    currFocusElInfo.el = null;
+    currFocusElInfo.clientRect = undefined;
   }
 };
 
@@ -334,63 +317,39 @@ export const doAnimate = ({
             : offsetDistanceY
         }
   ) as { offsetDistanceDx: number; offsetDistanceDy: number };
-  if (focusElTop - currScrollElOffsetTop - currScrollElScrollTop < offsetDistanceDy) {
-    // 上
-    if (currScrollElScrollTop) {
-      runAnimate({
-        scrollEl: currScrollEl,
-        scrollType: SCROLLTOP,
-        smooth,
-        smoothTime,
-        end,
-        easing,
-        from: currScrollElScrollTop,
-        to: focusElTop - currScrollElOffsetTop - offsetDistanceDy + currScrollElScrollTop
-      });
-    }
-  } else if (focusElTop - currScrollElOffsetTop - currScrollElScrollTop > offsetDistanceDy) {
-    // 下
-    if (currScrollElScrollTop + currScrollElHeight < currScrollElScrollHeight) {
-      runAnimate({
-        scrollEl: currScrollEl,
-        scrollType: SCROLLTOP,
-        smooth,
-        smoothTime,
-        end,
-        easing,
-        from: currScrollElScrollTop,
-        to: focusElTop - currScrollElOffsetTop - offsetDistanceDy + currScrollElScrollTop
-      });
-    }
+  if (
+    currScrollElScrollTop ||
+    currScrollElScrollTop + currScrollElHeight < currScrollElScrollHeight
+  ) {
+    // 上下
+    runAnimate({
+      focusEl,
+      scrollEl: currScrollEl,
+      scrollType: SCROLLTOP,
+      smooth,
+      smoothTime,
+      end,
+      easing,
+      from: currScrollElScrollTop,
+      to: focusElTop - currScrollElOffsetTop - offsetDistanceDy + currScrollElScrollTop
+    });
   }
-  if (focusElLeft - currScrollElOffsetLeft - currScrollElScrollLeft < offsetDistanceDx) {
-    // 左
-    if (currScrollElScrollLeft) {
-      runAnimate({
-        scrollEl: currScrollEl,
-        scrollType: SCROLLLEFT,
-        smooth,
-        smoothTime,
-        end,
-        easing,
-        from: currScrollElScrollLeft,
-        to: focusElLeft - currScrollElOffsetLeft - offsetDistanceDx + currScrollElScrollLeft
-      });
-    }
-  } else if (focusElLeft - currScrollElOffsetLeft - currScrollElScrollLeft > offsetDistanceDx) {
-    // 右
-    if (currScrollElScrollLeft + currScrollElWidth < currScrollElScrollWidth) {
-      runAnimate({
-        scrollEl: currScrollEl,
-        scrollType: SCROLLLEFT,
-        smooth,
-        smoothTime,
-        end,
-        easing,
-        from: currScrollElScrollLeft,
-        to: focusElLeft - currScrollElOffsetLeft - offsetDistanceDx + currScrollElScrollLeft
-      });
-    }
+  if (
+    currScrollElScrollLeft ||
+    currScrollElScrollLeft + currScrollElWidth < currScrollElScrollWidth
+  ) {
+    // 左右
+    runAnimate({
+      focusEl,
+      scrollEl: currScrollEl,
+      scrollType: SCROLLLEFT,
+      smooth,
+      smoothTime,
+      end,
+      easing,
+      from: currScrollElScrollLeft,
+      to: focusElLeft - currScrollElOffsetLeft - offsetDistanceDx + currScrollElScrollLeft
+    });
   }
 };
 
@@ -445,7 +404,9 @@ export const onLimitChange = (el: HTMLElement, val: boolean) => {
 };
 
 export const updateScrollGroupRecord = ({ key, el }) => {
-  if (key in SCROLL_GROUP_RECORD) {
+  if (key in SCROLL_GROUP_RECORD && !el) {
+    delete SCROLL_GROUP_RECORD[key];
+  } else {
     SCROLL_GROUP_RECORD[key] = { lastFocus: el };
   }
 };
@@ -730,9 +691,20 @@ const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
           if (intersectedFinalFocusElTuple[0] === INFINITY) {
             // 如果相交里有值，则不再计算不相交的值
             if (sideLen < notIntersectedFinalFocusElTuple[0]) {
-              if (!el.hasAttribute(SCROLL_GROUP_KEY)) {
-                notIntersectedFinalFocusElTuple = [sideLen, el];
-              }
+              const isAvailableScrollGroup =
+                el.hasAttribute(SCROLL_GROUP_KEY) && !el.hasAttribute(itemAttrname);
+              notIntersectedFinalFocusElTuple = isAvailableScrollGroup
+                ? dealScrollGroupFocusElTuple({
+                    sideLen,
+                    el,
+                    currFocusEl,
+                    direction,
+                    originTop,
+                    originLeft,
+                    originRight,
+                    originBottom
+                  })
+                : [sideLen, el];
             }
           }
         }
@@ -753,18 +725,32 @@ const dealIntersectedEl = ({ currFocusEl, focusableEls, direction }) => {
     (ArrayIncludes(limitDirection[scrollDirection] || [], direction)
       ? intersectedEl
       : scrollFindFocusTypeIntersected
-        ? intersectedEl
-        : intersectedEl || notIntersectedEl) || null
+      ? intersectedEl
+      : intersectedEl || notIntersectedEl) || null
   );
 };
 
 const animationObj = {};
 
-const runAnimate = ({ scrollEl, scrollType, smooth, smoothTime, end, easing, from, to }) => {
+const runAnimate = ({
+  focusEl,
+  scrollEl,
+  scrollType,
+  smooth,
+  smoothTime,
+  end,
+  easing,
+  from,
+  to
+}) => {
   const { smoothTime: sSmoothTime, fps } = defaultConfig;
   const animationScrollEl = animationObj[scrollEl];
   if (animationScrollEl) {
     if (animationScrollEl[scrollType]) {
+      if (focusEl === lastFocusEl) {
+        // 在最后一个继续按的时候不执行滚动
+        return;
+      }
       // 清除动画
       animationScrollEl[scrollType]();
     }
@@ -774,7 +760,6 @@ const runAnimate = ({ scrollEl, scrollType, smooth, smoothTime, end, easing, fro
       [scrollType]: null
     };
   }
-  const isEndFunc = typeof end === 'function';
   const { cancel } = animation({
     from,
     to,
@@ -785,11 +770,12 @@ const runAnimate = ({ scrollEl, scrollType, smooth, smoothTime, end, easing, fro
     update: (obj) => {
       scrollEl[scrollType] = obj[scrollType];
       if (obj.end) {
+        const animationScrollEl = animationObj[scrollEl];
         if (animationScrollEl) {
           delete animationScrollEl[scrollType];
           !Object.keys(animationScrollEl).length && delete animationObj[scrollEl];
         }
-        isEndFunc && end();
+        typeof end === 'function' && end();
       }
     }
   });
