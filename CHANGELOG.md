@@ -1,3 +1,10 @@
+## 1.3.3 (2024-11-13)
+
+- 增加 `non-scrollable` 不滚动标志
+- 优化 `blur` 事件
+- 优化滚动事件判断
+- `v-limitgroup` 值默认为 `true`
+
 ## 1.3.2 (2024-10-08)
 
 - `limitGroup` 自定义指令增加 `unmounted` 周期
